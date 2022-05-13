@@ -34,7 +34,7 @@ from gaussproc_emu import *
 
 # # Start by loading the training results
 
-root_dir = "/sps/lsst/users/campagne/emuPK/JEC/"
+root_dir = "./"
 
 cosmologies = load_arrays(root_dir + 'trainingset/components', 'cosmologies')
 print(f"Cosmo: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
@@ -76,8 +76,6 @@ else:
 
 par = {'omega_cdm': 0.12, 'omega_b': 0.022, 'ln10^{10}A_s': 2.9, 'n_s': 1.0, 'h': 0.75}
 
-
-par.values().
 
 theta_star = jnp.array([val for val in par.values()])
 
@@ -202,11 +200,12 @@ pl_star_z0 = jax.numpy.interp(k_star, ks, pred_pl)
 z_star = jnp.array([z_star]*k_star.shape[0])
 qf_star = ut.interp2d(k_star,z_star,ks,zs,pred_qf)   
 
-pnl_star = D_star * pl_star_z0 * qf_star 
+pl_star = D_star * pl_star_z0
+pnl_star = pl_star * qf_star 
 
 plt.figure(figsize=(8,8))
-plt.scatter(k_new,pl_new, s=3, label=r"$P_{lin}(k, \Theta_\ast)$")
-plt.scatter(k_new,pnl_new, s=3,label=r"$P_{nl}(k, \Theta_\ast)$")
+plt.scatter(k_star,pl_star, s=3, label=r"$P_{lin}(k, \Theta_\ast)$")
+plt.scatter(k_star,pnl_star, s=3,label=r"$P_{nl}(k, \Theta_\ast)$")
 plt.legend()
 plt.xscale("log")
 plt.yscale("log")
