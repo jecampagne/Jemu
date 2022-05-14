@@ -47,7 +47,7 @@ n_gf = growth_factor.shape[1]
 assert n_gf == st.nz, "Growth: Hummm something strange..."
 print(f"The number of GPs to model Growth={n_gf} (= nber of z_bins) ")
 folder_gf = root_dir + '/pknl_components' + st.d_one_plus + '/gf'
-arg_gf = [[cosmologies, growth_factor[:, i], st.gf_args, folder_gf, 'gp_sc_' + str(i)] for i in range(n_gf)]
+arg_gf = [[cosmologies, growth_factor[:, i], st.gf_args, folder_gf, 'gp_' + str(i)] for i in range(n_gf)]
 
 
 # Pk Linear 
@@ -214,4 +214,11 @@ plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
 plt.grid()
 plt.title(r"Jemu @ $z=0.5$");
 
+
+class emuPk():
+    def __init__():
+        print("New Pk Emulator")
+    def load_all_gps(self, directory: str):
+        folder_gf = root_dir + '/pknl_components' + st.d_one_plus + '/gf'
+        arg_gf = [[cosmologies, growthfolder_gf, 'gp_sc_' + str(i)] for i in range(n_gf)]
 
