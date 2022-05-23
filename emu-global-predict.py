@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -7,9 +8,9 @@
 #       format_version: '1.5'
 #       jupytext_version: 1.11.3
 #   kernelspec:
-#     display_name: jaxcosmo
+#     display_name: jaxccl
 #     language: python
-#     name: jaxcosmo
+#     name: jaxccl
 # ---
 
 # +
@@ -144,7 +145,7 @@ k_new = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, 200, endpoint=True)
 pl_new = jax.numpy.interp(k_new, ks, pred_pl)
 
 plt.figure(figsize=(8,8))
-plt.scatter(ks, pred_pl, s=3,label=r"$Pk_{lin}(\Theta_\ast, k_{train})$")
+plt.scatter(ks, pred_pl, s=10,label=r"$Pk_{lin}(\Theta_\ast, k_{train})$")
 plt.plot(k_new,pl_new,c="r", label=r"$Pk_{lin}(\Theta_\ast,k_\ast)$")
 plt.legend()
 plt.xlabel("k")
@@ -175,6 +176,12 @@ pred_qf = pred_qf.reshape(st.nk, st.nz)
 
 pred_qf.shape
 
+ks.shape,zs.shape
+
+ks
+
+zs
+
 # +
 #interp2d (x,y,xp,yp,zp)
 #    Args:
@@ -189,7 +196,17 @@ pred_qf.shape
 # -
 
 # qf_new[i] = qf_interp[k_new[i],z_new[i]]; len(k_new)=len(z_new) 
-qf_new=ut.interp2d(k_new,z_new,ks,zs,pred_qf)   
+qf_new=ut.coogan_interp2d(k_new,z_new,ks,zs,pred_qf)   
+qf_new_bis=jnp.array([ut.coogan_interp2d(k,z,ks,zs,pred_qf)  for k,z in zip(k_new,z_new)])
+qf_new_jec=jnp.array([ut.jec_interp2d(k,z,ks,zs,pred_qf) for k,z in zip(k_new,z_new)])
+
+plt.plot(qf_new, label="Coogan (a)")
+plt.plot(qf_new_bis,ls="--", label="Coogan (b)")
+plt.plot(qf_new_jec,ls="-.", label="JEC")
+plt.xlim([140,160])
+plt.ylim([0,10])
+plt.grid()
+plt.legend();
 
 # # Pk non linear at z=0.5  pour $\Theta_\ast$
 
@@ -198,17 +215,26 @@ D_star = jax.numpy.interp(z_star, zs, pred_gf)
 
 D_star
 
-k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, 10000, endpoint=True)
+ks.shape, zs.shape
+
+z_star = 0.5
+k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, 100, endpoint=True)
 pl_star_z0 = jax.numpy.interp(k_star, ks, pred_pl)
-z_star = jnp.array([z_star]*k_star.shape[0])
-qf_star = ut.interp2d(k_star,z_star,ks,zs,pred_qf)   
+#z_star = jnp.array([z_star]*k_star.shape[0])
+qf_star = jnp.array([ut.coogan_interp2d(k,z_star,ks,zs,pred_qf)   for k in k_star])
+
+# +
+#qf_star
+# -
+
+qf_star.shape, D_star, pl_star_z0.shape
 
 pl_star = D_star * pl_star_z0
 pnl_star = pl_star * qf_star 
 
 plt.figure(figsize=(8,8))
-plt.scatter(k_star,pl_star, s=3, label=r"$P_{lin}(k, \Theta_\ast)$")
-plt.scatter(k_star,pnl_star, s=3,label=r"$P_{nl}(k, \Theta_\ast)$")
+plt.scatter(k_star,pl_star, s=10, label=r"$P_{lin}(k, \Theta_\ast)$")
+plt.scatter(k_star,pnl_star, s=10,label=r"$P_{nl}(k, \Theta_\ast)$")
 plt.legend()
 plt.xscale("log")
 plt.yscale("log")
@@ -217,124 +243,9 @@ plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
 plt.grid()
 plt.title(r"Jemu @ $z=0.5$");
 
+from jemupk import *
 
-class emuPk():
-    def __init__(self,):
-        print("New Pk Emulator")
-        
-        self.z_train = jnp.linspace(st.zmin, st.zmax, st.nz, endpoint=True)
-        self.k_train = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, st.nk, endpoint=True)
-
-    def load_all_gps(self, directory: str):
-        """
-        Load optimizer GPs
-        gf: growth factor D(z)
-        pl: linear power spectrum P(k,z=0)
-        qf: q-function (1+q(k,z))
-        """
-        
-        # Growth factor
-        folder_gf = directory + '/gf'
-        n_gf = st.nz
-        arg_gf = [[folder_gf, 'gp_' + str(i)] for i in range(n_gf)]
-        
-        self.gps_gf = []
-        for i_gf in range(n_gf):
-            gf_model = GPEmu(kernel=kernel_RBF,
-                         order=st.order,
-                         x_trans=st.x_trans,
-                         y_trans=st.gf_args['y_trans'],
-                         use_mean=st.use_mean)
-            gf_model.load_info(arg_gf[i_gf][0], arg_gf[i_gf][1])
-            self.gps_gf.append(gf_model)
-            
-        # Linear Pk
-        folder_pl = directory + '/pl'
-        n_pl = st.nk
-        arg_pl = [[folder_pl, 'gp_' + str(i)] for i in range(n_pl)]
-        
-        self.gps_pl = []
-        for i_pl in range(n_pl):
-            pl_model = GPEmu(kernel=kernel_RBF,
-                         order=st.order,
-                         x_trans=st.x_trans,
-                         y_trans=st.pl_args['y_trans'],
-                         use_mean=st.use_mean)
-            pl_model.load_info(arg_pl[i_pl][0], arg_pl[i_pl][1])
-            self.gps_pl.append(pl_model)
-        
-        #Q-func
-        folder_qf = directory + '/qf'
-        n_qf = st.nz * st.nk
-        arg_qf = [[folder_qf, 'gp_' + str(i)] for i in range(n_qf)]
-        
-        self.gps_qf= []
-        for i_qf in range(n_qf):
-            qf_model = GPEmu(kernel=kernel_RBF,
-                         order=st.order,
-                         x_trans=st.x_trans,
-                         y_trans=st.qf_args['y_trans'],          ######
-                         use_mean=st.use_mean)
-            qf_model.load_info(arg_qf[i_qf][0], arg_qf[i_qf][1])
-            self.gps_qf.append(qf_model)
-            
-    def gp_kzgrid_pred(self,theta_star):
-        """
-        Predict GPs at the (k_i,z_j) 'i,j' in st.nk x st.nz grid
-        k_i = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, st.nk, endpoint=True)
-        z_j = jnp.linspace(st.zmin, st.zmax, st.nz, endpoint=True)
-        
-        input: theta_star (1D array)
-            eg. array([0.12,0.022, 2.9, 1.0, 0.75])
-            for {'omega_cdm': 0.12, 'omega_b': 0.022, 'ln10^{10}A_s': 2.9, 'n_s': 1.0, 'h': 0.75}
-            
-        return: growth factor, non linear pk, linear pk (without growth included)
-        """
-                
-        # Growth @ z_j
-        pred_gf = jnp.stack([gf_model.simple_predict(theta_star) for gf_model in self.gps_gf])
-        # Linear Pk @ k_i, z=0
-        pred_pl_z0 = jnp.stack([pl_model.pred_original_function(theta_star) for pl_model in self.gps_pl])
-        
-        #Linear Pk @ (k_i,z_j)
-        pred_pl = jnp.dot(pred_pl_z0.reshape(st.nk,1), pred_gf.reshape(1,st.nz))
-        
-        # Q-func @ (k_i, z_j)
-        pred_qf = jnp.stack([qf_model.pred_original_function(theta_star) for qf_model in self.gps_qf])
-
-        #Non linear Pk @ (k_i,z_j)
-        pred_pnl = pred_qf.reshape(st.nk, st.nz) * pred_pl
-        
-        
-        return pred_pnl, pred_gf, pred_pl_z0
-        
-    def interp_pk(self,theta_star, k_star, z_star):
-        
-        """
-        interpolation non linear power spectrum aka pk_nl (growth:gf & linear power spec.: pk_l)
- 
-        input:
-         theta_star (1D array)
-            eg. array([0.12,0.022, 2.9, 1.0, 0.75])
-            for {'omega_cdm': 0.12, 'omega_b': 0.022, 'ln10^{10}A_s': 2.9, 'n_s': 1.0, 'h': 0.75}
-         k_star (1D array)
-            eg. k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, N, endpoint=True)
-         z_star float
-            
-        return 
-           array: pk_nl(theta_star, k_star[i], z_star[i])  i<N
-           idem   gf and pk_l
-        """
-        pred_pnl, pred_gf, pred_pl_z0 = self.gp_kzgrid_pred(theta_star)
-
-        interp_gf    = jax.numpy.interp(z_star, self.z_train, pred_gf)
-        interp_pl_z0 = jax.numpy.interp(k_star, self.k_train, pred_pl_z0)
-        z_star = jnp.array([z_star]*k_star.shape[0])
-        interp_pnl   = ut.interp2d(k_star,z_star,self.k_train,self.z_train,pred_pnl)
-        
-        return interp_pnl, interp_gf, interp_pl_z0
-
-emu = emuPk()
+emu = JemuPk()
 
 emu.load_all_gps(directory = root_dir + '/pknl_components' + st.d_one_plus)
 
@@ -349,12 +260,12 @@ pred_gf.shape,pred_pl.shape,pred_qf.shape
 
 N=10*st.nk 
 k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, N, endpoint=True)
-z_star = 0.5
+z_star = 0.
 pk_nl, gf, pk_lz0 = emu.interp_pk(theta_star, k_star,z_star)
 
 plt.figure(figsize=(8,8))
-plt.scatter(k_star,pk_lz0*gf, s=3, label=r"$P_{lin}(k, \Theta_\ast)$")
-plt.scatter(k_star,pk_nl, s=3,label=r"$P_{nl}(k, \Theta_\ast)$")
+plt.plot(k_star,pk_lz0*gf, lw=3, label=r"$P_{lin}(k, \Theta_\ast)$")
+plt.plot(k_star,pk_nl, lw=1,label=r"$P_{nl}(k, \Theta_\ast)$")
 plt.legend()
 plt.xscale("log")
 plt.yscale("log")
@@ -362,21 +273,194 @@ plt.xlabel(r"$k [h\ Mpc^{-1}]$")
 plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
 plt.grid()
 plt.title(rf"Jemu @ $z={z_star}$");
+plt.xlim([1e-3,1])
+plt.ylim([1e2,1e5])
 
-N=10*st.nk 
-k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, N, endpoint=True)
-z_star = 1.5
+
+# # Comparaison 
+
+import jax_cosmo as jc
+import pyccl as ccl
+
+# +
+# Sur un jeu de theta cosmo de training
+# -
+
+cosmologies
+
+#Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h
+#cosmologies[0]=array([0.12616742, 0.02163407, 2.72607173, 1.15724975, 0.73022459])
+h_emu = 0.73022459
+omega_c_emu = 0.12616742    # omega_c h^2
+omega_b_emu = 0.02163407   #omega_b h^2
+n_s_emu = 1.15724975
+ln1010As_emu = 2.72607173
+As_emu = 10**(-10)*np.exp(ln1010As_emu)
+
+
+# +
+#h_emu = 0.75
+#omega_c_emu = 0.12    # omega_c h^2
+#omega_b_emu = 0.022   #omega_b h^2
+#n_s_emu = 1.0
+#ln1010As_emu=2.9
+#As_emu = 10**(-10)*np.exp(ln1010As_emu)
+# -
+
+
+# ## Attention: l'emulateur prend 'Omega_c h^2' et 'Omega_b h^2' contrairement à CCL et jax-cosmo 
+
+# +
+
+
+omega_c_ccl = omega_c_emu/h_emu**2
+omega_b_ccl = omega_b_emu/h_emu**2
+
+
+sigma8_emu = ccl.Cosmology(
+    Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
+    h=h_emu, A_s=As_emu, n_s=n_s_emu, Neff=0,
+    transfer_function='boltzmann_camb').sigma8()
+
+cosmo_ccl= ccl.Cosmology(
+    Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
+    h=h_emu, sigma8=sigma8_emu, n_s=n_s_emu, Neff=0,
+    transfer_function='eisenstein_hu', matter_power_spectrum='halofit')
+# -
+
+params_emu = {'omega_cdm': omega_c_emu, 'omega_b': omega_b_emu, 
+             'ln10^{10}A_s':ln1010As_emu , 
+             'n_s': n_s_emu, 'h': h_emu}
+theta_star = jnp.array([val for val in params_emu.values()])
+#Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h
+theta_star
+
+Nk=10*st.nk 
+k_star = jnp.geomspace(5e-4, 5e1,Nk, endpoint=True)
+z_star = 1.22631579
 pk_nl, gf, pk_lz0 = emu.interp_pk(theta_star, k_star,z_star)
 
-plt.figure(figsize=(8,8))
-plt.scatter(k_star,pk_lz0*gf, s=3, label=r"$P_{lin}(k, \Theta_\ast)$")
-plt.scatter(k_star,pk_nl, s=3,label=r"$P_{nl}(k, \Theta_\ast)$")
+pk_nl /= h_emu**2
+pk_lz0 /= h_emu**2
+
+# +
+cosmo_jax = jc.Cosmology(Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
+    h=h_emu, sigma8=sigma8_emu, n_s=n_s_emu, Omega_k=0, w0=-1.0,wa=0.0)
+
+pk_lin_ccl = ccl.linear_matter_power(cosmo_ccl, k_star*cosmo_jax.h, 1./(1+z_star)) #last is scale factor 1=>z=0
+
+pk_lin_jc = jc.power.linear_matter_power(cosmo_jax,k_star, 1./(1+z_star))/cosmo_jax.h**3
+# -
+
+plt.figure(figsize=(10,8))
+plt.plot(k_star,pk_lz0*gf,lw=5, label="Jemu")
+plt.plot(k_star,pk_lin_jc,lw=3, label="jax_cosmo")
+plt.plot(k_star,pk_lin_ccl,lw=3, ls="--",label="ccl")
+#plt.plot(k_star,pk_nl, lw=1,label=r"$P_{nl}(k, \Theta_\ast)$")
 plt.legend()
 plt.xscale("log")
 plt.yscale("log")
-plt.xlabel(r"$k [h\ Mpc^{-1}]$")
+plt.xlabel(r"$k [Mpc^{-1}]$")
 plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
 plt.grid()
-plt.title(rf"Jemu @ $z={z_star}$");
+plt.title(rf"$z={z_star}$");
+plt.xlim([1e-3,1e2])
+plt.ylim([1e-2,1e6])
+
+# +
+cosmo_ccl_EH= ccl.Cosmology(
+    Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
+    h=h_emu, sigma8=sigma8_emu, n_s=n_s_emu, Neff=0,
+    transfer_function='eisenstein_hu', matter_power_spectrum='halofit')
+
+
+cosmo_ccl_CAMB_nus= ccl.Cosmology(
+    Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
+    h=h_emu, sigma8=sigma8_emu, n_s=n_s_emu, m_nu=0.06, Neff=3.046,
+    transfer_function='boltzmann_camb', matter_power_spectrum='halofit')
+
+
+pk_nonlin_ccl_EH = ccl.nonlin_matter_power(cosmo_ccl_EH, k_star*cosmo_jax.h, 
+                                        1./(1+z_star)) #last is scale factor 1=>z=0
+
+pk_nonlin_ccl_CAMB_nus = ccl.nonlin_matter_power(cosmo_ccl_CAMB_nus, k_star*cosmo_jax.h, 
+                                        1./(1+z_star)) #last is scale factor 1=>z=0
+
+pk_nonlin_jc = jc.power.nonlinear_matter_power(cosmo_jax,k_star, 
+                                               1./(1+z_star))/cosmo_jax.h**3
+# -
+
+plt.figure(figsize=(10,8))
+plt.plot(k_star,pk_nl,lw=5, label="Jemu")
+plt.plot(k_star,pk_nonlin_jc,lw=3, label="jax_cosmo")
+plt.plot(k_star,pk_nonlin_ccl_EH,lw=3, ls="--",label="ccl (EH+Halofit)")
+plt.plot(k_star,pk_nonlin_ccl_CAMB_nus,lw=3, ls="-.",label="ccl (CAMB)")
+#plt.plot(k_star,pk_nl, lw=1,label=r"$P_{nl}(k, \Theta_\ast)$")
+plt.legend()
+plt.xscale("log")
+plt.yscale("log")
+plt.xlabel(r"$k [Mpc^{-1}]$")
+plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
+plt.grid()
+plt.title(rf"$z={z_star}$");
+plt.xlim([1e-3,1e2])
+plt.ylim([1e-2,1e6])
+
+thetabin=0
+cosmologies[thetabin]
+
+zbin=5
+zs[zbin]
+
+gF = growth_factor[thetabin,zbin]
+
+pklinz0 = pk_linear[thetabin]
+
+pklin= gF * pklinz0
+
+Qf = (1+q_function[thetabin]).reshape(st.nk, st.nz)
+
+Qf[:,zbin]
+
+pknl = pklin * Qf[:,zbin]
+
+# +
+#rescaling
+# -
+
+h = cosmologies[thetabin][-1]
+
+h
+
+pklin /= h**2
+pknl /= h**2
+
+plt.scatter(ks,pklin,label='train Plin')
+plt.scatter(ks,pknl,label='train Pnl')
+plt.xscale("log")
+plt.yscale("log")
+
+# +
+plt.figure(figsize=(10,8))
+plt.plot(k_star,pk_nl,lw=5, label="Jemu")
+plt.plot(k_star,pk_nonlin_jc,lw=3, label="jax_cosmo")
+plt.plot(k_star,pk_nonlin_ccl_EH,lw=3, ls="--",label="ccl (EH+Halofit)")
+#plt.scatter(ks,pklin,label='train Plin')
+plt.scatter(ks,pknl,label='train Pnl')
+
+#plt.plot(k_star,pk_nonlin_ccl_CAMB,lw=3, ls="--",label="ccl (CAMB)")
+#plt.plot(k_star,pk_nl, lw=1,label=r"$P_{nl}(k, \Theta_\ast)$")
+plt.legend()
+plt.xscale("log")
+plt.yscale("log")
+plt.xlabel(r"$k [Mpc^{-1}]$")
+plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
+plt.grid()
+plt.title(rf"$z={zs[zbin]:.4f}$, {cosmo_jax}");
+plt.xlim([1e-3,1e2])
+plt.ylim([1e-2,1e6])
+# -
+
+
 
 
