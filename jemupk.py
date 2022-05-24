@@ -65,6 +65,7 @@ class JemuPk():
             qf_model.load_info(arg_qf[i_qf][0], arg_qf[i_qf][1])
             self.gps_qf.append(qf_model)
             
+            
     def gp_kzgrid_pred(self,theta_star):
         """
         Predict GPs at the (k_i,z_j) 'i,j' in st.nk x st.nz grid
@@ -94,8 +95,8 @@ class JemuPk():
         
         
         return pred_pnl, pred_gf, pred_pl_z0
-        
-    def interp_pk(self,theta_star, k_star, z_star):
+    
+    def interp_pk(self,theta_star, k_star, z_star, grid_opt=False):
         
         """
         interpolation non linear power spectrum aka pk_nl (growth:gf & linear power spec.: pk_l)
@@ -104,31 +105,45 @@ class JemuPk():
          theta_star (1D array)
             eg. array([0.12,0.022, 2.9, 1.0, 0.75])
             for {'omega_cdm': 0.12, 'omega_b': 0.022, 'ln10^{10}A_s': 2.9, 'n_s': 1.0, 'h': 0.75}
-         k_star (1D array)
-            eg. k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, N, endpoint=True)
-         z_star float
-            
-        return 
-           array: pk_nl(theta_star, k_star[i], z_star[i])  i<N
-           idem   gf and pk_l
+         k_star : see below 
+         z_star :  idem 
+         
+         grid_opt: True if one wants to compute interpolations on a grid of (k_star,z_star)
+                   False by default
+                   
+         return: interpolation at k*,z* of pknl(k*,z*), growth(z*), pklin(k*) @ z=0
+         
+         k*     z*     pknl shape       gf shape       pklin shape      comment
+         ----------------------------------------------------------------------
+         float float      (1,)            (1,)             (1,)         
+         float  (n,)      (n,1)           (n,)             (1,)
+         (n,)   float     (1,n)           (1,)             (n,)
+         (n,)   (n,)      (n,)            (n,)             (n,)          grid_opt=False, Pknl(ki,zi)
+         (m,)   (n,)      (n,m)           (n,)             (m,)          grid_opt=True, Pknl(kj,zi)
+                                            
         """
         pred_pnl, pred_gf, pred_pl_z0 = self.gp_kzgrid_pred(theta_star)
 
-        # JEC 19/5/2022 use jax-cosmo 1D spline
+        
+        z_star = jnp.atleast_1d(z_star)
+        k_star = jnp.atleast_1d(k_star)
+        
+        
         spline1D_z = InterpolatedUnivariateSpline(self.z_train, pred_gf)
-        #interp_gf    = jax.numpy.interp(z_star, self.z_train, pred_gf)
         interp_gf    = spline1D_z(z_star)
 
-        
         spline1D_k = InterpolatedUnivariateSpline(self.k_train, pred_pl_z0)
-        # interp_pl_z0 = jax.numpy.interp(k_star, self.k_train, pred_pl_z0)
         interp_pl_z0 = spline1D_k(k_star)
         
         
-        z_star = jnp.array([z_star]*k_star.shape[0])
-#        interp_pnl = jnp.array([ut.interp2d(k,z,self.k_train,self.z_train,pred_pnl)  
-#                                for k,z in zip(k_star,z_star)])
-        interp_pnl   = ut.interp2d(k_star,z_star,self.k_train,self.z_train,pred_pnl)
-        interp_pnl = interp_pnl.reshape(k_star.shape)
+        
+        if grid_opt:
+            k_star_g, z_star_g = jnp.meshgrid(k_star, z_star)
+            k_star_flat = k_star_g.reshape((-1,))
+            z_star_flat = z_star_g.reshape((-1,))
+            interp_pnl   = ut.interp2d(k_star_flat,z_star_flat,self.k_train,self.z_train,pred_pnl)
+            interp_pnl = interp_pnl.reshape(z_star.shape[0],k_star.shape[0])
+        else:
+            interp_pnl   = ut.interp2d(k_star,z_star,self.k_train,self.z_train,pred_pnl)
         
         return interp_pnl, interp_gf, interp_pl_z0

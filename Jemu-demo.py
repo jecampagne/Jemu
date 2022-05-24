@@ -65,23 +65,42 @@ theta_star
 
 Nk=10*st.nk 
 k_star = jnp.geomspace(5e-4, 5e1,Nk, endpoint=True)
-z_star = 1.22631579
-pk_nl, gf, pk_lz0 = emu.interp_pk(theta_star, k_star,z_star)
+z_star = jnp.array([0.,1.22631579])
+pk_nl, gf, pk_lz0 = emu.interp_pk(theta_star, k_star,z_star, grid_opt=True)
+
+pk_nl.shape, gf.shape, pk_lz0.shape
 
 pk_nl /= h_emu**2
 pk_lz0 /= h_emu**2
 
+plt.figure(figsize=(10,8))
+plt.plot(k_star, pk_lz0*gf[0],label=fr"$Pk_{{lin}}$ z={z_star[0]:.2f}")
+plt.plot(k_star, pk_lz0*gf[1],label=fr"$Pk_{{lin}}$ z={z_star[1]:.2f}")
+plt.plot(k_star, pk_nl[0], label=fr"$Pk_{{nl}}$ z={z_star[0]:.2f}")
+plt.plot(k_star, pk_nl[1], label=fr"$Pk_{{nl}}$ z={z_star[1]:.2f}")
+plt.xscale("log")
+plt.yscale("log")
+plt.xlabel(r"$k [Mpc^{-1}]$")
+plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
+plt.grid()
+plt.xlim([1e-3,1e2])
+plt.ylim([1e-2,1e6])
+plt.legend();
+
 # +
+z_ccl = z_star[1].item()
+
+
 cosmo_jax = jc.Cosmology(Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
     h=h_emu, sigma8=sigma8_emu, n_s=n_s_emu, Omega_k=0, w0=-1.0,wa=0.0)
 
-pk_lin_ccl = ccl.linear_matter_power(cosmo_ccl, k_star*cosmo_jax.h, 1./(1+z_star)) #last is scale factor 1=>z=0
+pk_lin_ccl = ccl.linear_matter_power(cosmo_ccl, k_star*cosmo_jax.h, 1./(1+z_ccl)) #last is scale factor 1=>z=0
 
-pk_lin_jc = jc.power.linear_matter_power(cosmo_jax,k_star, 1./(1+z_star))/cosmo_jax.h**3
+pk_lin_jc = jc.power.linear_matter_power(cosmo_jax,k_star, 1./(1+z_ccl))/cosmo_jax.h**3
 # -
 
 plt.figure(figsize=(10,8))
-plt.plot(k_star,pk_lz0*gf,lw=5, label="Jemu")
+plt.plot(k_star,pk_lz0*gf[1],lw=5, label="Jemu")
 plt.plot(k_star,pk_lin_jc,lw=3, label="jax_cosmo")
 plt.plot(k_star,pk_lin_ccl,lw=3, ls="--",label="ccl")
 #plt.plot(k_star,pk_nl, lw=1,label=r"$P_{nl}(k, \Theta_\ast)$")
@@ -91,7 +110,7 @@ plt.yscale("log")
 plt.xlabel(r"$k [Mpc^{-1}]$")
 plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
 plt.grid()
-plt.title(rf"$z={z_star}$");
+plt.title(rf"$z={z_ccl:.2f}$");
 plt.xlim([1e-3,1e2])
 plt.ylim([1e-2,1e6])
 
@@ -103,15 +122,15 @@ cosmo_ccl_EH= ccl.Cosmology(
 
 
 pk_nonlin_ccl_EH = ccl.nonlin_matter_power(cosmo_ccl_EH, k_star*cosmo_jax.h, 
-                                        1./(1+z_star)) #last is scale factor 1=>z=0
+                                        1./(1+z_ccl)) #last is scale factor 1=>z=0
 
 
 pk_nonlin_jc = jc.power.nonlinear_matter_power(cosmo_jax,k_star, 
-                                               1./(1+z_star))/cosmo_jax.h**3
+                                               1./(1+z_ccl))/cosmo_jax.h**3
 # -
 
 plt.figure(figsize=(10,8))
-plt.plot(k_star,pk_nl,lw=5, label="Jemu")
+plt.plot(k_star,pk_nl[1],lw=5, label="Jemu")
 plt.plot(k_star,pk_nonlin_jc,lw=3, label="jax_cosmo (EH+Halofit)")
 plt.plot(k_star,pk_nonlin_ccl_EH,lw=3, ls="--",label="ccl (EH+Halofit)")
 #plt.plot(k_star,pk_nl, lw=1,label=r"$P_{nl}(k, \Theta_\ast)$")
@@ -121,7 +140,7 @@ plt.yscale("log")
 plt.xlabel(r"$k [Mpc^{-1}]$")
 plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
 plt.grid()
-plt.title(rf"$z={z_star}$");
+plt.title(rf"$z={z_ccl:.2f}$");
 plt.xlim([1e-3,1e2])
 plt.ylim([1e-2,1e6])
 
