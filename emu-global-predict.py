@@ -456,7 +456,7 @@ plt.yscale("log")
 plt.xlabel(r"$k [Mpc^{-1}]$")
 plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
 plt.grid()
-plt.title(rf"$z={zs[zbin]:.4f}$, {cosmo_jax}");
+plt.title(rf"$z={zs[zbin]:.4f}$, {params_emu}");
 plt.xlim([1e-3,1e2])
 plt.ylim([1e-2,1e6])
 # -
