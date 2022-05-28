@@ -50,6 +50,13 @@ cosmo_ccl = ccl.Cosmology(
     transfer_function='boltzmann_class', matter_power_spectrum='halofit')
 
 sigma8_emu = cosmo_ccl.sigma8()
+
+
+cosmo_ccl = ccl.Cosmology(
+    Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
+    h=h_emu, n_s=n_s_emu, sigma8 = sigma8_emu,
+    transfer_function='eisenstein_hu', matter_power_spectrum='halofit')
+
 # -
 
 cosmo_ccl
@@ -196,5 +203,7 @@ plt.xscale("log")
 plt.title("Relative diff. wrt CLASS");
 #
 # -
+
+
 
 
