@@ -77,7 +77,7 @@ assert n_pl == st.nk, "Hummm something strange..."
 print(f"The number of GPs to model Pklin={n_pl} (= nber of k_bins) ")
 
 if  st.sigma8:
-    folder_pl = root_dir + '/pknl_components' + st.d_one_plus +  '_sig8' + '/pl'
+    folder_pl = root_dir + '/pknl_components' + st.d_one_plus +  '_sig8_RBF' + '/pl'
 else:
     folder_pl = root_dir + '/pknl_components' + st.d_one_plus +  '_As' + '/pl'
     

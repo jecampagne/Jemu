@@ -76,7 +76,7 @@ assert n_qf == st.nk * st.nz, "Hummm something strange..."
 print(f"The number of GPs to model Q-func={n_qf}")
 
 if  st.sigma8:
-    folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8' + '/qf'
+    folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_Matern12' + '/qf'
 else:
     folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_As' + '/qf'
     
@@ -101,7 +101,7 @@ sigmas = []
 
 for i_qf in range(n_qf):
     # for the time beeing re-instance the class each time
-    gp_model = GPEmu(kernel=kernel_RBF,
+    gp_model = GPEmu(kernel=kernel_Matern12, #kernel_RBF,
                          order=st.order,
                          x_trans=st.x_trans,
                          y_trans=st.qf_args['y_trans'],          ######

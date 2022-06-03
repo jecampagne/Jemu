@@ -6,11 +6,14 @@ import util as ut              # utility function
 from gaussproc_emu import *
 
 class JemuPk():
-    def __init__(self,):
+    def __init__(self,kernel_gf=kernel_RBF, kernel_pklin=kernel_RBF, kernel_qfunc=kernel_Matern12):
         print("New Pk Emulator")
         
         self.z_train = jnp.linspace(st.zmin, st.zmax, st.nz, endpoint=True)
         self.k_train = jnp.geomspace(st.k_min_h_by_Mpc, st.kmax, st.nk, endpoint=True)
+        self.kernel_gf = kernel_gf
+        self.kernel_pklin = kernel_pklin
+        self.kernel_qfunc = kernel_qfunc
 
     def load_all_gps(self, directory: str):
         """
@@ -27,7 +30,7 @@ class JemuPk():
         
         self.gps_gf = []
         for i_gf in range(n_gf):
-            gf_model = GPEmu(kernel=kernel_RBF,
+            gf_model = GPEmu(kernel=self.kernel_gf,     #kernel_RBF,
                          order=st.order,
                          x_trans=st.x_trans,
                          y_trans=st.gf_args['y_trans'],
@@ -42,7 +45,7 @@ class JemuPk():
         
         self.gps_pl = []
         for i_pl in range(n_pl):
-            pl_model = GPEmu(kernel=kernel_RBF,
+            pl_model = GPEmu(kernel=self.kernel_pklin,
                          order=st.order,
                          x_trans=st.x_trans,
                          y_trans=st.pl_args['y_trans'],
@@ -57,7 +60,7 @@ class JemuPk():
         
         self.gps_qf= []
         for i_qf in range(n_qf):
-            qf_model = GPEmu(kernel=kernel_RBF,
+            qf_model = GPEmu(kernel=self.kernel_qfunc,
                          order=st.order,
                          x_trans=st.x_trans,
                          y_trans=st.qf_args['y_trans'],          ######
@@ -105,6 +108,8 @@ class JemuPk():
          theta_star (1D array)
             eg. array([0.12,0.022, 2.9, 1.0, 0.75])
             for {'omega_cdm': 0.12, 'omega_b': 0.022, 'ln10^{10}A_s': 2.9, 'n_s': 1.0, 'h': 0.75}
+            or array([0.12,0.022, 0.8, 1.0, 0.75])  
+            for {'omega_cdm': 0.12, 'omega_b': 0.022, 'sigma8': 0.8, 'n_s': 1.0, 'h': 0.75}
          k_star : see below 
          z_star :  idem 
          

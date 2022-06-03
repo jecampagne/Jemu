@@ -92,7 +92,7 @@ print(f"Growth Fact: nber of training points {growth_factor.shape[0]} for {growt
 n_gf = growth_factor.shape[1]
 print(f"The number of GPs to model Growth={n_gf} (= nber of z_bins) ")
 if  st.sigma8:
-    folder_gf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8' + '/gf'
+    folder_gf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_RBF' + '/gf'
 else:
     folder_gf = root_dir + '/pknl_components' + st.d_one_plus + '_As' + '/gf'
     
@@ -182,17 +182,17 @@ for i_gf in range(max_gf):#n_gf):
     
     # GP emulator should be done each time due to jit
     # Todo: see how to change GPEmu to avoid
-    gp_model = GPEmuTraining(kernel=kernel_RBF,
+    gp_model = GPEmuTraining(kernel=kernel_RBF,           ## was kernel_RBF,
                          var=st.var,
                          order=st.order,
-                         lambda_cap=st.gf_args['lambda_cap'],
+                         lambda_cap=st.gf_args['lambda_cap'],  ###
                          l_min=st.l_min,
                          l_max=st.l_max,
                          a_min=st.a_min,
                          a_max=st.a_max,
                          jitter=st.jitter,
                          x_trans=st.x_trans,
-                         y_trans=st.gf_args['y_trans'],
+                         y_trans=st.gf_args['y_trans'],         ####
                          use_mean=st.use_mean)
 
     

@@ -90,7 +90,7 @@ assert n_pl == st.nk, "Hummm something strange..."
 print(f"The number of GPs to model Pklin={n_pl} (= nber of k_bins) ")
 
 if  st.sigma8:
-    folder_pl = root_dir + '/pknl_components' + st.d_one_plus +  '_sig8' + '/pl'
+    folder_pl = root_dir + '/pknl_components' + st.d_one_plus +  '_sig8_RBF' + '/pl'
 else:
     folder_pl = root_dir + '/pknl_components' + st.d_one_plus +  '_As' + '/pl'
     
@@ -180,7 +180,7 @@ for i_pl in range(n_pl):
 
     # GP emulator should be done each time due to jit
     # Todo: see how to change GPEmu to avoid
-    gp_model = GPEmuTraining(kernel=kernel_RBF,
+    gp_model = GPEmuTraining(kernel=kernel_RBF,          # was kernel_RBF,
                          var=st.var,
                          order=st.order,
                          lambda_cap=st.pl_args['lambda_cap'],   #####ICI

@@ -84,7 +84,7 @@ print(f"Growth Fact: nber of training points {growth_factor.shape[0]} for {growt
 n_gf = growth_factor.shape[1]
 print(f"The number of GPs to model Growth={n_gf} (= nber of z_bins) ")
 if  st.sigma8:
-    folder_gf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8' + '/gf'
+    folder_gf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_Matern12' + '/gf'
 else:
     folder_gf = root_dir + '/pknl_components' + st.d_one_plus + '_As' + '/gf'
     
@@ -104,7 +104,7 @@ means = []
 sigmas = []
 for i_gf in range(1,n_gf):
     # for the time beeing re-instance the class each time
-    gp_model = GPEmu(kernel=kernel_RBF,
+    gp_model = GPEmu(kernel=kernel_Matern12, #kernel_RBF,
                          order=st.order,
                          x_trans=st.x_trans,
                          y_trans=st.gf_args['y_trans'],
@@ -155,7 +155,6 @@ arg_gf[0][2]
 
 # + tags=[]
 medians=np.array(medians)
-iqrs = np.array(iqrs)
 means=np.array(means)
 sigmas=np.array(sigmas)
 # -

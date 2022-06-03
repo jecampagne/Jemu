@@ -89,7 +89,7 @@ assert n_qf == st.nk * st.nz, "Hummm something strange..."
 print(f"The number of GPs to model Q-func={n_qf}")
 
 if  st.sigma8:
-    folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8' + '/qf'
+    folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_Matern12' + '/qf'
 else:
     folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_As' + '/qf'
     
@@ -181,7 +181,7 @@ for i_qf in range(n_qf):
 
     # GP emulator should be done each time due to jit
     # Todo: see how to change GPEmu to avoid
-    gp_model = GPEmuTraining(kernel=kernel_RBF,
+    gp_model = GPEmuTraining(kernel=kernel_Matern12,          # was kernel_RBF
                          var=st.var,
                          order=st.order,
                          lambda_cap=st.qf_args['lambda_cap'],   #####ICI

@@ -114,16 +114,16 @@ use_mean = False
 n_restart = 5
 
 # minimum lengthscale (in log) -5 -> 0
-l_min = -5.0
+l_min = -5.0    # was -5.0
 
 # maximum lengthscale (in log)
-l_max = 5.0
+l_max = 5.0    # was 5.0
 
 # minimum amplitude (in log) was 0.0 -> -5.0 =>exp(-5)\sim 7e-3
-a_min = -5.0 
+a_min = -5.0   # was -5.0 
 
 # maximum amplitude (in log) 25 ->10  (5 for Growth at least)
-a_max = 5.0
+a_max = 5.0 # was 5.0
 
 
 # choice of optimizer (better to use 'L-BFGS-B')

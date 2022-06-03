@@ -35,7 +35,7 @@ import settings_gfpkq  as st         # configuration file (update 2/June/22)
 # if false     Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h
 # -
 
-emu = JemuPk()
+emu = JemuPk(kernel_gf=kernel_RBF, kernel_pklin=kernel_RBF, kernel_qfunc=kernel_Matern12)
 root_dir = "./"
 if st.sigma8:
     tag="_sig8"
@@ -44,6 +44,8 @@ else:
     tag="_As"
     print("Using: Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h")
 emu.load_all_gps(directory = root_dir + '/pknl_components' + st.d_one_plus+tag)
+
+jc.Planck15()
 
 # + tags=[]
 h_emu = 0.7
