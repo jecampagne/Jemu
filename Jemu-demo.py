@@ -27,29 +27,43 @@ mpl.rc('image', cmap='jet')
 mpl.rcParams['font.size'] = 20
 import matplotlib.patches as mpatches
 
+import settings_gfpkq  as st         # configuration file (update 2/June/22)
+
+# +
+
+# if true  use Omega_cdm h^2, Omega_b h^2, sigma8,       ns, h
+# if false     Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h
+# -
+
 emu = JemuPk()
 root_dir = "./"
-emu.load_all_gps(directory = root_dir + '/pknl_components' + st.d_one_plus)
+if st.sigma8:
+    tag="_sig8"
+    print("Using: Omega_cdm h^2, Omega_b h^2, sigma8, ns, h")
+else:
+    tag="_As"
+    print("Using: Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h")
+emu.load_all_gps(directory = root_dir + '/pknl_components' + st.d_one_plus+tag)
 
-#Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h
-#Omega_c=0.3, Omega_b=0.05, h=0.7, sigma8 = 0.8, n_s=0.96,
+# + tags=[]
 h_emu = 0.7
 omega_c_emu = 0.3 * h_emu**2   # omega_c h^2
 omega_b_emu = 0.05 * h_emu**2  #omega_b h^2
 n_s_emu = 0.96
-ln1010As_emu = 2.76
-As_emu = 10**(-10)*np.exp(ln1010As_emu)
-
-# +
 omega_c_ccl = omega_c_emu/h_emu**2
 omega_b_ccl = omega_b_emu/h_emu**2
 
-cosmo_ccl = ccl.Cosmology(
-    Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
-    h=h_emu, A_s=As_emu, n_s=n_s_emu,
-    transfer_function='boltzmann_class', matter_power_spectrum='halofit')
-
-sigma8_emu = cosmo_ccl.sigma8()
+if st.sigma8:
+    sigma8_emu = 0.8005244775226154
+else:
+    print("Use boltzmann_class to compute sigma8 from As")
+    ln1010As_emu = 2.76
+    As_emu = 10**(-10)*np.exp(ln1010As_emu)
+    cosmo_ccl = ccl.Cosmology(
+        Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
+        h=h_emu, A_s=As_emu, n_s=n_s_emu,
+        transfer_function='boltzmann_class', matter_power_spectrum='halofit')
+    sigma8_emu = cosmo_ccl.sigma8()
 
 
 cosmo_ccl = ccl.Cosmology(
@@ -61,13 +75,26 @@ cosmo_ccl = ccl.Cosmology(
 
 cosmo_ccl
 
-sigma8_emu
 
+
+# +
 params_emu = {'omega_cdm': omega_c_emu, 'omega_b': omega_b_emu, 
-             'ln10^{10}A_s':ln1010As_emu , 
-             'n_s': n_s_emu, 'h': h_emu}
-theta_star = jnp.array([val for val in params_emu.values()])
-#Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h
+              'n_s': n_s_emu, 'h': h_emu}
+
+if st.sigma8:
+    params_emu['norm']=sigma8_emu
+else:
+    params_emu['norm'] = ln1010As_emu
+# -
+
+params_emu
+
+# +
+# Care should be taken of the order
+# -
+
+theta_star = jnp.array([params_emu['omega_cdm'], params_emu['omega_b'],
+                       params_emu['norm'], params_emu['n_s'], params_emu['h']])
 theta_star
 
 Nk=10*st.nk 
@@ -104,6 +131,9 @@ cosmo_jax = jc.Cosmology(Omega_c=omega_c_ccl, Omega_b=omega_b_ccl,
 pk_lin_ccl = ccl.linear_matter_power(cosmo_ccl, k_star*cosmo_jax.h, 1./(1+z_ccl)) #last is scale factor 1=>z=0
 
 pk_lin_jc = jc.power.linear_matter_power(cosmo_jax,k_star, 1./(1+z_ccl))/cosmo_jax.h**3
+# -
+
+cosmo_jax
 
 # +
 # Classy
@@ -111,7 +141,6 @@ pk_lin_jc = jc.power.linear_matter_power(cosmo_jax,k_star, 1./(1+z_ccl))/cosmo_j
 # +
 params_def_classy = {
     'output': 'mPk',
-    'A_s': As_emu,
     'n_s': n_s_emu, 
     'h': h_emu,
     'omega_b': omega_b_emu,
@@ -126,6 +155,12 @@ params_def_classy = {
     'halofit_k_per_decade' : 80.,
     'halofit_sigma_precision' : 0.05
     }
+
+if st.sigma8:
+    params_def_classy['sigma8']=sigma8_emu
+else:
+    params_def_classy['A_s']=As_emu,
+
 
 
 params_classy_lin =  params_def_classy.copy()
@@ -203,7 +238,5 @@ plt.xscale("log")
 plt.title("Relative diff. wrt CLASS");
 #
 # -
-
-
 
 

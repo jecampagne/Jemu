@@ -1,6 +1,9 @@
 # from helper.py
 import os
 import dill
+
+import numpy as np
+
 import jax
 import jaxopt
 import jax.numpy as jnp
