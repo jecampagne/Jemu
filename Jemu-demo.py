@@ -30,44 +30,98 @@ import matplotlib.patches as mpatches
 import settings_gfpkq  as st         # configuration file (update 2/June/22)
 
 # +
+# Set emulator parameters
+param_emu = {}
 
-# if true  use Omega_cdm h^2, Omega_b h^2, sigma8,       ns, h
-# if false     Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h
-# -
+param_emu['kernel_gf']    = kernel_RBF
+param_emu['kernel_pklin'] = kernel_RBF
+param_emu['kernel_qfunc'] = kernel_Matern12
 
-emu = JemuPk(kernel_gf=kernel_RBF, kernel_pklin=kernel_RBF, kernel_qfunc=kernel_Matern12)
+param_emu['zmin'] = st.zmin
+param_emu['zmax'] = st.zmax
+param_emu['nz']   = st.nz
+
+param_emu['kmin'] = st.k_min_h_by_Mpc
+param_emu['kmax'] = st.k_max_h_by_Mpc
+param_emu['nk']   = st.nk
+
+param_emu['order'] = st.order
+param_emu['x_trans'] = st.x_trans
+param_emu['gf_y_trans'] = st.gf_args['y_trans']
+param_emu['pl_y_trans'] = st.pl_args['y_trans']
+param_emu['qf_y_trans'] = st.qf_args['y_trans']
+param_emu['use_mean'] = st.use_mean
+
 root_dir = "./"
 if st.sigma8:
-    tag="_sig8"
     print("Using: Omega_cdm h^2, Omega_b h^2, sigma8, ns, h")
 else:
-    tag="_As"
     print("Using: Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h")
-emu.load_all_gps(directory = root_dir + '/pknl_components' + st.d_one_plus+tag)
 
-jc.Planck15()
+param_emu['load_dir'] = root_dir + '/pknl_components' + st.d_one_plus+tag
+
+
+
+# -
+
+emu = JemuPk(param_emu)
+
+import helper as hp   
+if st.sigma8:
+    #############
+    # Load cosmological parameter sets
+    # Omega_cdm h^2, Omega_b h^2, sigma8, ns, h
+    ###########
+    cosmologies = hp.load_arrays(root_dir + 'trainingset','cosmologies_sig8')
+    tag="sigma8"
+else:
+    #############
+    # Load cosmological parameter sets
+    # Omega_cdm h^2, Omega_b h^2, ln10^10As, ns, h
+    ###########
+    cosmologies = hp.load_arrays(root_dir + 'trainingset', 'cosmologies_As')
+    tag="As"
+print(f"Cosmo[{tag}]: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
+
+cond1 = cosmologies[:,2]<0.81
+cond2 = cosmologies[:,2]>0.79
+cosmologies[cond1 & cond2]
+
+np.where(cond1 & cond2)
+
+cosmologies[251]
 
 # + tags=[]
-h_emu = 0.7
-omega_c_emu = 0.3 * h_emu**2   # omega_c h^2
-omega_b_emu = 0.05 * h_emu**2  #omega_b h^2
-n_s_emu = 0.96
+use_training_pt = False
+if use_training_pt:
+    #sigma8
+    cosmo = cosmologies[251]
+    omega_c_emu = cosmo[0]
+    omega_b_emu = cosmo[1]
+    sigma8_emu = cosmo[2]
+    n_s_emu = cosmo[3]
+    h_emu = codmo[4]
+else:
+    h_emu = 0.7
+    omega_c_emu = 0.3 * h_emu**2   # omega_c h^2
+    omega_b_emu = 0.05 * h_emu**2  #omega_b h^2
+    n_s_emu = 0.96
+
+    if st.sigma8:
+        sigma8_emu = 0.8005245
+    else:
+        print("Use boltzmann_class to compute sigma8 from As")
+        ln1010As_emu = 2.76
+        As_emu = 10**(-10)*np.exp(ln1010As_emu)
+        cosmo_ccl = ccl.Cosmology(
+            Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
+            h=h_emu, A_s=As_emu, n_s=n_s_emu,
+            transfer_function='boltzmann_class', matter_power_spectrum='halofit')
+        sigma8_emu = cosmo_ccl.sigma8()
+
+
 omega_c_ccl = omega_c_emu/h_emu**2
 omega_b_ccl = omega_b_emu/h_emu**2
-
-if st.sigma8:
-    sigma8_emu = 0.8005244775226154
-else:
-    print("Use boltzmann_class to compute sigma8 from As")
-    ln1010As_emu = 2.76
-    As_emu = 10**(-10)*np.exp(ln1010As_emu)
-    cosmo_ccl = ccl.Cosmology(
-        Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
-        h=h_emu, A_s=As_emu, n_s=n_s_emu,
-        transfer_function='boltzmann_class', matter_power_spectrum='halofit')
-    sigma8_emu = cosmo_ccl.sigma8()
-
-
 cosmo_ccl = ccl.Cosmology(
     Omega_c=omega_c_ccl, Omega_b=omega_b_ccl, 
     h=h_emu, n_s=n_s_emu, sigma8 = sigma8_emu,
@@ -133,9 +187,6 @@ cosmo_jax = jc.Cosmology(Omega_c=omega_c_ccl, Omega_b=omega_b_ccl,
 pk_lin_ccl = ccl.linear_matter_power(cosmo_ccl, k_star*cosmo_jax.h, 1./(1+z_ccl)) #last is scale factor 1=>z=0
 
 pk_lin_jc = jc.power.linear_matter_power(cosmo_jax,k_star, 1./(1+z_ccl))/cosmo_jax.h**3
-# -
-
-cosmo_jax
 
 # +
 # Classy
@@ -194,6 +245,13 @@ pk_nonlin_ccl = ccl.nonlin_matter_power(cosmo_ccl, k_star*cosmo_jax.h,
 
 pk_nonlin_jc = jc.power.nonlinear_matter_power(cosmo_jax,k_star, 
                                                1./(1+z_ccl))/cosmo_jax.h**3
+# -
+
+# Clean CLASS memory
+class_module_lin.struct_cleanup()
+class_module_lin.empty()
+class_module_nl.struct_cleanup()
+class_module_nl.empty()
 
 # +
 plt.figure(figsize=(10,8))
