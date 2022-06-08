@@ -47,7 +47,8 @@ root_dir = "./"
 assert st.sigma8, "Use sigma8 cosmology for this Emulator interface to Jax-cosmo"
 print("Using: Omega_cdm h^2, Omega_b h^2, sigma8, ns, h")
 
-param_emu['load_dir'] = root_dir + '/pknl_components' + st.d_one_plus+"_sig8"
+param_emu['load_dir'] = root_dir + '/pknl_components' \
+        + st.d_one_plus+"_sig8_" + str(st.nk) + "x" + str(st.nz)
 
 param_emu['kernel_gf']    = kernel_RBF
 param_emu['kernel_pklin'] = kernel_RBF
@@ -59,6 +60,17 @@ emu = JemuPk(param_emu)
 
 cosmo_jax = jc.Planck15()
 
+# par = {'omega_cdm': 0.12, 'omega_b': 0.022, 'ln10^{10}A_s': 2.9, 'n_s': 1.0, 'h': 0.75}
+
+
+h_emu = 0.75
+omega_c_emu = 0.12 / h_emu**2
+omega_b_emu = 0.022 / h_emu**2
+sigma8_emu = 0.8
+n_s_emu = 1.0
+cosmo_jax = jc.Cosmology(Omega_c=omega_c_emu, Omega_b=omega_b_emu, sigma8=sigma8_emu, n_s=n_s_emu, h=h_emu,
+                        Omega_k=0., w0=-1.,wa=0.)
+
 Nk=10*st.nk 
 k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.k_max_h_by_Mpc,Nk, endpoint=True) #h/Mpc
 z_star = jnp.array([0.,1.])
@@ -69,28 +81,27 @@ pk_nonlin = emu.nonlinear_pk(cosmo_jax,k_star, z_star)
 
 pklin.shape
 
-plt.plot(k_star,pklin[0])
-plt.plot(k_star,pklin[1])
-plt.plot(k_star,pk_nonlin[0])
-plt.plot(k_star,pk_nonlin[1])
+# +
+plt.figure(figsize=(10,8))
+
+plt.plot(k_star,pklin[0],label=fr"$Pk_{{lin}}$ z={z_star[0]:.2f}")
+plt.plot(k_star,pklin[1],label=fr"$Pk_{{lin}}$ z={z_star[1]:.2f}")
+plt.plot(k_star,pk_nonlin[0], label=fr"$Pk_{{nl}}$ z={z_star[0]:.2f}")
+plt.plot(k_star,pk_nonlin[1], label=fr"$Pk_{{nl}}$ z={z_star[1]:.2f}")
 plt.xscale("log")
 plt.yscale("log")
+plt.xlabel(r"$k [h Mpc^{-1}]$")
+plt.ylabel(r"$P_\delta(k,z) [Mpc^3]$")
+plt.grid()
+plt.xlim([1e-3,1e2])
+plt.ylim([1e-2,1e6])
+plt.legend();
+# -
 
 z_test = 1.0
 
 func = lambda p: emu.linear_pk(p,k_star, z_star=z_test)
 func_nl = lambda p: emu.nonlinear_pk(p,k_star, z_star=z_test)
-
-pk_lin_emu = func(cosmo_jax)
-
-pk_nonlin_emu = func_nl(cosmo_jax)
-
-plt.plot(k_star,pk_lin_emu,label="pk lin")
-plt.plot(k_star,pk_nonlin_emu,label="pk nl")
-plt.xscale("log")
-plt.yscale("log")
-plt.grid()
-plt.legend();
 
 jac_lin_emu = jax.jacfwd(func)(cosmo_jax)
 jac_nonlin_emu = jax.jacfwd(func_nl)(cosmo_jax)

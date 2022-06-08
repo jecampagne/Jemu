@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -55,8 +56,10 @@ param_emu['use_mean'] = st.use_mean
 root_dir = "./"
 if st.sigma8:
     print("Using: Omega_cdm h^2, Omega_b h^2, sigma8, ns, h")
+    tag='_sig8_'  + str(st.nk) + "x" + str(st.nz)  
 else:
     print("Using: Omega_cdm h^2, Omega_b h^2, ln(10^10 As), ns, h")
+    tag='_As'
 
 param_emu['load_dir'] = root_dir + '/pknl_components' + st.d_one_plus+tag
 
@@ -83,12 +86,6 @@ else:
     tag="As"
 print(f"Cosmo[{tag}]: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
 
-cond1 = cosmologies[:,2]<0.81
-cond2 = cosmologies[:,2]>0.79
-cosmologies[cond1 & cond2]
-
-np.where(cond1 & cond2)
-
 cosmologies[251]
 
 # + tags=[]
@@ -100,7 +97,7 @@ if use_training_pt:
     omega_b_emu = cosmo[1]
     sigma8_emu = cosmo[2]
     n_s_emu = cosmo[3]
-    h_emu = codmo[4]
+    h_emu = cosmo[4]
 else:
     h_emu = 0.7
     omega_c_emu = 0.3 * h_emu**2   # omega_c h^2
@@ -156,7 +153,7 @@ theta_star
 Nk=10*st.nk 
 k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.k_max_h_by_Mpc,Nk, endpoint=True) #h/Mpc
 z_star = jnp.array([0.,1.])
-pk_nl, gf, pk_lz0 = emu.interp_pk(theta_star, k_star,z_star, grid_opt=True)
+pk_nl, gf, pk_lz0 = emu.interp_pk(theta_star, k_star,z_star, use_scipy=False, grid_opt=True)
 
 pk_nl.shape, gf.shape, pk_lz0.shape
 
@@ -190,6 +187,9 @@ pk_lin_jc = jc.power.linear_matter_power(cosmo_jax,k_star, 1./(1+z_ccl))/cosmo_j
 
 # +
 # Classy
+# -
+
+st.fixed_nm['M_tot']
 
 # +
 params_def_classy = {
@@ -203,8 +203,8 @@ params_def_classy = {
     'T_ncdm': 0.71611, 
     'N_ur': 0.00641,
     'm_ncdm':0.02,
-    'z_max_pk' : 4.66,
-    'P_k_max_h/Mpc' : 50.,
+    'z_max_pk' :  st.zmax,
+    'P_k_max_h/Mpc' : st.k_max_h_by_Mpc,
     'halofit_k_per_decade' : 80.,
     'halofit_sigma_precision' : 0.05
     }
@@ -214,6 +214,8 @@ if st.sigma8:
 else:
     params_def_classy['A_s']=As_emu,
 
+#Neutrino default
+params_def_classy['m_ncdm'] = st.fixed_nm['M_tot']/params_def_classy['deg_ncdm']
 
 
 params_classy_lin =  params_def_classy.copy()
@@ -284,7 +286,10 @@ plt.plot(k_star,(pk_lin_ccl-pk_class_lin)/pk_class_lin,lw=2, c="lime", label="cc
 plt.legend()
 plt.grid()
 plt.xscale("log");
-plt.title("Relative diff. wrt CLASS");
+plt.ylim([-0.05,0.05])
+plt.plot([k_star.min(),k_star.max()],[-0.01,-0.01],c='k',ls='--')
+plt.plot([k_star.min(),k_star.max()],[0.01,0.01],c='k',ls='--')
+plt.title("Pk Lin: Relative diff. wrt CLASS");
 
 # +
 plt.figure(figsize=(10,8))
@@ -295,7 +300,10 @@ plt.plot(k_star,(pk_nonlin_ccl-pk_class_nl)/pk_class_nl,lw=2,c="lime",  label="c
 plt.grid()
 plt.legend()
 plt.xscale("log")
-plt.title("Relative diff. wrt CLASS");
+plt.ylim([-0.05,0.05])
+plt.plot([k_star.min(),k_star.max()],[-0.01,-0.01],c='k',ls='--')
+plt.plot([k_star.min(),k_star.max()],[0.01,0.01],c='k',ls='--')
+plt.title("Pk NLin: Relative diff. wrt CLASS");
 #
 # -
 

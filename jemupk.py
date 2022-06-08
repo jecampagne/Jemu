@@ -1,6 +1,7 @@
 from jax_cosmo.core import Cosmology as jc_cosmo
 from jax_cosmo.scipy.interpolate import InterpolatedUnivariateSpline
 
+
 import util as ut              # utility function
 # Simple non zero mean Gaussian Process class adapted for the emulator
 from gaussproc_emu import *
@@ -162,6 +163,9 @@ class JemuPk():
         pred_gf = jnp.stack([gf_model.simple_predict(theta_star) for gf_model in self.gps_gf])
         # Linear Pk @ k_i, z=0
         pred_pl_z0 = jnp.stack([pl_model.pred_original_function(theta_star) for pl_model in self.gps_pl])
+        
+        #Linear Pk @ (k_i,z_j)
+        pred_pl = jnp.dot(pred_pl_z0.reshape(self.nk,1), pred_gf.reshape(1,self.nz))
 
         # Q-func @ (k_i, z_j)
         pred_qf = jnp.stack([qf_model.pred_original_function(theta_star) for qf_model in self.gps_qf])
@@ -264,7 +268,7 @@ class JemuPk():
             
         
         #Get for this theta_star (cosmo param.) the GPs evaluations at all (k_i,z_j) of training grid. 
-        pred_pnl, pred_gf, pred_pl_z0 = self._gp_kzgrid_pred(theta_star)
+        pred_pnl, pred_gf, pred_pl_z0 = self._gp_kzgrid_pred_all(theta_star)
 
         ####
         # Compute the growth factor, pk_lin, pk_nl at the given (k_star, z_star)
@@ -275,18 +279,18 @@ class JemuPk():
         z_star = jnp.atleast_1d(z_star)
         k_star = jnp.atleast_1d(k_star)
         
-        
         spline1D_z = InterpolatedUnivariateSpline(self.z_train, pred_gf)
         interp_gf    = spline1D_z(z_star)
 
         spline1D_k = InterpolatedUnivariateSpline(self.k_train, pred_pl_z0)
         interp_pl_z0 = spline1D_k(k_star)
-        
+
         if grid_opt:
             k_star_g, z_star_g = jnp.meshgrid(k_star, z_star)
             k_star_flat = k_star_g.reshape((-1,))
             z_star_flat = z_star_g.reshape((-1,))
-            interp_pnl   = ut.interp2d(k_star_flat,z_star_flat,self.k_train,self.z_train,pred_pnl)
+            interp_pnl = ut.interp2d(k_star_flat,z_star_flat,
+                                     self.k_train,self.z_train,pred_pnl)
             interp_pnl = interp_pnl.reshape(z_star.shape[0],k_star.shape[0])
         else:
             assert k_star.shape == z_star.shape, "k_star and z_star should have same size"

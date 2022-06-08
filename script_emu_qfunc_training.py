@@ -79,7 +79,8 @@ print(f"Matrix diag term for stability: { st.jitter}")
 
 #########
 if st.sigma8:
-    q_function = load_arrays(root_dir +'trainingset/components_sig8', 'q_function')
+    dirName = root_dir + 'trainingset/components_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
+    q_function = load_arrays(dirName, 'q_function')
 else:
     q_function = load_arrays(root_dir +'trainingset/components_As', 'q_function')
 
@@ -89,7 +90,7 @@ assert n_qf == st.nk * st.nz, "Hummm something strange..."
 print(f"The number of GPs to model Q-func={n_qf}")
 
 if  st.sigma8:
-    folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_Matern12' + '/qf'
+    folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_' + str(st.nk) + "x" + str(st.nz) + "_Matern12" + '/qf'
 else:
     folder_qf = root_dir + '/pknl_components' + st.d_one_plus +'_As' + '/qf'
     

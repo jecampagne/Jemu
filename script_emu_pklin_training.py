@@ -80,7 +80,8 @@ print(f"Matrix diag term for stability: { st.jitter}")
 
 #########
 if st.sigma8:
-    pk_linear = hp.load_arrays(root_dir + 'trainingset/components_sig8', 'pk_linear')
+    dirName = root_dir + 'trainingset/components_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
+    pk_linear = hp.load_arrays(dirName, 'pk_linear')
 else:
     pk_linear = hp.load_arrays(root_dir + 'trainingset/components_As', 'pk_linear')
     
@@ -90,7 +91,7 @@ assert n_pl == st.nk, "Hummm something strange..."
 print(f"The number of GPs to model Pklin={n_pl} (= nber of k_bins) ")
 
 if  st.sigma8:
-    folder_pl = root_dir + '/pknl_components' + st.d_one_plus +  '_sig8_RBF' + '/pl'
+    folder_pl = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_' + str(st.nk) + "x" + str(st.nz) +  '_RBF' + '/pl'
 else:
     folder_pl = root_dir + '/pknl_components' + st.d_one_plus +  '_As' + '/pl'
     

@@ -179,7 +179,7 @@ if __name__ == "__main__":
     print("Save....")
 
     if st.sigma8:
-        dirName =  root_dir + 'trainingset/components_sig8/'
+        dirName =  root_dir + 'trainingset/components_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
     else:
         dirName =  root_dir + 'trainingset/components_As/'
         

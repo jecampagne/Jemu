@@ -47,7 +47,7 @@ kmax = 50.0
 k_min_h_by_Mpc = 5E-4
 
 # number of k
-nk = 40
+nk = 120
 
 # number of redshift on the grid
 nz = 20

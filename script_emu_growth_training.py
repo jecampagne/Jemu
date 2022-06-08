@@ -81,7 +81,8 @@ print(f"Matrix diag term for stability: { st.jitter}")
 
 #########
 if st.sigma8:
-    growth_factor = hp.load_arrays(root_dir + 'trainingset/components_sig8', 'growth_factor')
+    dirName = root_dir + 'trainingset/components_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
+    growth_factor = hp.load_arrays(dirName, 'growth_factor')
 else:
     growth_factor = hp.load_arrays(root_dir + 'trainingset/components_As', 'growth_factor')
 
@@ -92,7 +93,7 @@ print(f"Growth Fact: nber of training points {growth_factor.shape[0]} for {growt
 n_gf = growth_factor.shape[1]
 print(f"The number of GPs to model Growth={n_gf} (= nber of z_bins) ")
 if  st.sigma8:
-    folder_gf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_RBF' + '/gf'
+    folder_gf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_' + str(st.nk) + "x" + str(st.nz) +  '_RBF' + '/gf'
 else:
     folder_gf = root_dir + '/pknl_components' + st.d_one_plus + '_As' + '/gf'
     
