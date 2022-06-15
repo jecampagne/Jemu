@@ -6,12 +6,15 @@ from timeit import default_timer as timer
 import os
 import logging
 
-import settings_gfpkq  as st         # configuration file (update 2/June/22)
+import settings_gfpkq_120x20  as st         # configuration file (update 2/June/22)
 import helper as hp   
 # Simple Gaussian process class adapted for the emulator
 from gaussproc_emu_training import *
 
 
+#######
+# Training of Qfunc(k,z)
+#######
 
 def get_logger(name: str, log_name: str, folder_name: str = 'logs'):
     '''

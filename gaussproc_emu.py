@@ -297,3 +297,16 @@ class GPEmu(GPEmuBase):
         mu = self.simple_predict(theta_star)
         y_original = self.transform.y_inv_transform_test(mu)
         return y_original
+
+    
+    def predict(self, theta_star: jnp.ndarray) -> jnp.ndarray:
+        """
+        prediction according to y_trans
+        """
+        if self.y_trans:
+            return self.pred_original_function(theta_star)
+        else:
+            return self.simple_predict(theta_star)
+        
+            
+    
