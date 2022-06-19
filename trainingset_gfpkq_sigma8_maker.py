@@ -25,8 +25,8 @@ def make_class_dict(cosmo, sigma8=True):
         'output': 'mPk',
         'n_s': n_s_emu, 
         'h': h_emu,
-        'omega_b': omega_b_emu,
-        'omega_cdm':omega_c_emu,
+        'Omega_b': Omega_b_emu,          #####
+        'Omega_cdm':Omega_c_emu,         #####
         'N_ncdm': 1.0, 
         'deg_ncdm': 3.0, 
         'T_ncdm': 0.71611, 
