@@ -189,6 +189,9 @@ class JemuPk():
     
     
     def builtTheta(self, cosmo):
+        """ 
+            From jax-cosmo.core.Cosmology to emulator parameters
+        """
         return jnp.array([cosmo.Omega_c * (cosmo.h**2),
                                   cosmo.Omega_b * (cosmo.h**2),
                                   cosmo.sigma8,
@@ -198,7 +201,7 @@ class JemuPk():
     
     def linear_pk(self,cosmo, k_star, z_star=0.0):
         """
-        cosmo: jax-cosmo
+        cosmo: jax-cosmo.core.Cosmology
         interpolate Pk_lin on a grid (k_i, z_j)
         return PkLin(z,k)  : WARNING the shape is (Nz,Nk)
         """

@@ -12,7 +12,6 @@
 #     name: jaxccl
 # ---
 
-# +
 import numpy as np
 from classy import Class
 
@@ -20,7 +19,6 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 mpl.rc('image', cmap='jet')
 mpl.rcParams['font.size'] = 20
-# -
 
 h_emu = 0.73022459
 omega_c_emu = 0.12616742    # omega_c h^2
@@ -362,14 +360,17 @@ tmp = priors['omega_cdm']
 
 eval('scipy.stats.'+tmp['distribution'])(*tmp['specs'])
 
+# +
 stats = {}
 
 for c in priors:
     tmp = priors[c]
     stats[c] = eval('scipy.stats.'+tmp['distribution'])(*tmp['specs'])
+# -
 
 stats
 
+new_cosmo = np.zeros_like(latHypSpl)
 for i,p in enumerate(priors):
     new_cosmo[:,i] = stats[p].ppf(latHypSpl[:,i])
 
@@ -408,5 +409,381 @@ pklin0_bis = np.array([class_module_lin.pk_lin(k_g[k] * params_lin['h'], 0.0) fo
 
 
 pklin0_bis/pklin0
+
+# # Dev > 16 June 22
+
+from helper import *   
+import jax_cosmo as jc
+
+import scipy.interpolate as itp
+
+root_dir = "./"
+
+# {Omega_cdm h^2, Omega_b h^2, sigma8, ns, h}
+cosmologies = load_arrays(root_dir + 'trainingset/components_sig8_120x20', 'cosmo_validated')
+print(f"Cosmo: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
+
+
+def emu2jc(theta):
+    omega_c_emu, omega_b_emu, sigma8_emu, n_s_emu, h_emu = theta 
+    
+    return jc.Cosmology(Omega_c=omega_c_emu/h_emu**2, 
+                 Omega_b=omega_b_emu/h_emu**2, 
+                 h=h_emu, 
+                 n_s=n_s_emu,
+                 sigma8=sigma8_emu,   
+                 Omega_k=0.,
+                 w0=-1.0,
+                 wa=0.0)
+
+
+omega_c_arr = []
+omega_b_arr = []
+Omega_c_arr = []
+Omega_b_arr = []
+h_arr = []
+sigma8_arr = []
+Omega_m_arr = []   # secondary param
+Omega_de_arr = []  #   "
+ns_arr = []
+for ic, cosmo in enumerate(cosmologies):
+    if ic%100 == 0:
+        print(f"Cosmo[{ic}]...")
+    cosmo_jc = emu2jc(cosmo)
+    omega_c_arr.append(cosmo_jc.Omega_c * cosmo_jc.h**2)
+    omega_b_arr.append(cosmo_jc.Omega_b * cosmo_jc.h**2)
+    Omega_c_arr.append(cosmo_jc.Omega_c)
+    Omega_b_arr.append(cosmo_jc.Omega_b)
+    h_arr.append(cosmo_jc.h)
+    ns_arr.append(cosmo_jc.n_s)
+    sigma8_arr.append(cosmo_jc.sigma8)
+    Omega_m_arr.append(cosmo_jc.Omega_m)
+    Omega_de_arr.append(cosmo_jc.Omega_de)
+
+
+# +
+mpl.rc('image', cmap='jet')
+mpl.rcParams['font.size'] = 14
+fig,axs=plt.subplots(2,5,figsize=(17,10), gridspec_kw={"wspace":0.35})
+
+axs[0,0].hist(omega_c_arr, bins=50, density=True);
+axs[0,0].set_xlabel("$\omega_c$");
+axs[0,1].hist(omega_b_arr, bins=50, density=True);
+axs[0,1].set_xlabel("$\omega_b$");
+axs[0,2].hist(sigma8_arr, bins=50, density=True);
+axs[0,2].set_xlabel("$\sigma_8$");
+axs[0,3].hist(h_arr, bins=50, density=True);
+axs[0,3].set_xlabel("$h$");
+axs[0,4].hist(ns_arr, bins=50, density=True);
+axs[0,4].set_xlabel("$n_s$");
+
+axs[1,0].hist(Omega_c_arr, bins=50, density=True);
+axs[1,0].set_xlabel("$\Omega_c$");
+axs[1,1].hist(Omega_b_arr, bins=50, density=True);
+axs[1,1].set_xlabel("$\Omega_b$");
+axs[1,2].hist(Omega_m_arr, bins=50, density=True);
+axs[1,2].set_xlabel("$\Omega_m$");
+axs[1,3].hist(Omega_de_arr, bins=50, density=True);
+axs[1,3].set_xlabel("$\Omega_{de}$");
+
+fig.delaxes(axs[1,4])
+
+# -
+
+def make_class_dict(cosmo):
+
+    omega_c_emu = cosmo[0]    # omega_c h^2
+    omega_b_emu = cosmo[1]   #omega_b h^2
+    sigma8_emu  = cosmo[2]
+    n_s_emu = cosmo[3]
+    h_emu = cosmo[4]
+    
+    class_dict_def ={
+        'output': 'mPk',
+        'sigma8': sigma8_emu,
+        'n_s': n_s_emu, 
+        'h': h_emu,
+        'omega_b': omega_b_emu,
+        'omega_cdm':omega_c_emu,
+        'N_ncdm': 1.0, 
+        'deg_ncdm': 3.0, 
+        'T_ncdm': 0.71611, 
+        'N_ur': 0.00641,
+        'm_ncdm':0.02,
+        'z_max_pk' : 4.66,
+        'P_k_max_h/Mpc' : 50.,                 
+        'halofit_k_per_decade' : 80.,
+        'halofit_sigma_precision' : 0.05
+    }
+    class_dict_lin = class_dict_def.copy()
+    class_dict_lin['non_linear'] = 'none'
+    class_dict_nl = class_dict_def.copy()
+    class_dict_nl['non_linear'] = 'halofit'
+    
+    return class_dict_lin, class_dict_nl
+
+
+As_arr = []
+k_pivot = 0.05 # default CLASS 
+# As := Exp[ln(P_primodial(k=k_pivot))]
+for ic, cosmo in enumerate(cosmologies):
+    if ic%100 == 0:
+        print(f"Cosmo[{ic}]...")
+
+    params_lin, params_nl = make_class_dict(cosmo)
+    class_module_lin = Class()
+    class_module_lin.set(params_lin)
+    class_module_lin.compute()
+    
+    pk_primo = class_module_lin.get_primordial()  #
+    spline = itp.splrep(pk_primo['k [1/Mpc]'], pk_primo['P_scalar(k)'])
+    As = itp.splev(k_pivot, spline).item()*1e9
+    As_arr.append(As)
+    
+    class_module_lin.struct_cleanup()
+    class_module_lin.empty()
+
+
+def plot_loghist(x, bins, ax):
+  hist, bins = np.histogram(x, bins=bins)
+  logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
+  ax.hist(x, bins=logbins)
+  ax.set_xscale('log')
+
+
+
+# +
+mpl.rc('image', cmap='jet')
+mpl.rcParams['font.size'] = 14
+fig,axs=plt.subplots(2,5,figsize=(17,10), gridspec_kw={"wspace":0.35})
+
+axs[0,0].hist(omega_c_arr, bins=50, density=True);
+axs[0,0].set_xlabel("$\omega_c$");
+axs[0,1].hist(omega_b_arr, bins=50, density=True);
+axs[0,1].set_xlabel("$\omega_b$");
+axs[0,2].hist(sigma8_arr, bins=50, density=True);
+axs[0,2].set_xlabel("$\sigma_8$");
+axs[0,3].hist(h_arr, bins=50, density=True);
+axs[0,3].set_xlabel("$h$");
+axs[0,4].hist(ns_arr, bins=50, density=True);
+axs[0,4].set_xlabel("$n_s$");
+
+axs[1,0].hist(Omega_c_arr, bins=50, density=True);
+axs[1,0].set_xlabel("$\Omega_c$");
+axs[1,1].hist(Omega_b_arr, bins=50, density=True);
+axs[1,1].set_xlabel("$\Omega_b$");
+axs[1,2].hist(Omega_m_arr, bins=50, density=True);
+axs[1,2].set_xlabel("$\Omega_m$");
+axs[1,3].hist(Omega_de_arr, bins=50, density=True);
+axs[1,3].set_xlabel("$\Omega_{de}$");
+#axs[1,4].hist(As_arr, bins=50, density=True);
+
+hist, bins = np.histogram(As_arr, bins=50)
+logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
+axs[1,4].hist(As_arr, bins=logbins)
+axs[1,4].set_xlabel("$10^{-9}A_s$");
+axs[1,4].set_xscale("log")
+
+
+# -
+# # Try DES Y3 
+
+
+import pandas as pd
+import scipy
+
+latHypSpl = pd.read_csv('/sps/lsst/users/campagne/emuPK/emulator/'+ 'lhs/' + 'maximin_1000_5D', index_col=0).values
+
+priors = {
+    'Omega_cdm': {'distribution': 'uniform', 'specs': [0.1, 0.4]},    # [0.1, 0.5]
+    'Omega_b':   {'distribution': 'uniform', 'specs': [0.04, 0.02]},  # [0.04, 0.06]
+    'sigma8':    {'distribution': 'uniform', 'specs': [0.7, 0.2]},     # [0.7, 0.9]
+    'n_s':       {'distribution': 'uniform', 'specs': [0.87, 0.19]},    # [0.87, 1.06]
+    'h':         {'distribution': 'uniform', 'specs': [0.55, 0.25]}     # [0.55, 0.8]
+}
+
+priors.keys()
+
+stats = {}
+for c in priors:
+    tmp = priors[c]
+    stats[c] = eval('scipy.stats.'+tmp['distribution'])(*tmp['specs'])
+
+new_cosmo = np.zeros_like(latHypSpl)
+for i,p in enumerate(priors):
+    new_cosmo[:,i] = stats[p].ppf(latHypSpl[:,i])
+
+new_cosmo
+
+np.argmax(new_cosmo[:,1] * (new_cosmo[:,4]**2))
+
+new_cosmo[863]
+
+
+def make_class_dict(cosmo):
+
+    Omega_c_emu = cosmo[0]
+    Omega_b_emu = cosmo[1]
+    #As_emu  = cosmo[2] * 10**(-9)
+    sigma8_emu = cosmo[2]
+    n_s_emu = cosmo[3]
+    h_emu = cosmo[4]
+    
+    class_dict_def ={
+        'output': 'mPk',
+        'sigma8': sigma8_emu,
+        'n_s': n_s_emu, 
+        'h': h_emu,
+        'Omega_b': Omega_b_emu,              #### Omega and not omega=Omega h^2
+        'Omega_cdm': Omega_c_emu,            #### idem
+        'N_ncdm': 1.0, 
+        'deg_ncdm': 3.0, 
+        'T_ncdm': 0.71611, 
+        'N_ur': 0.00641,
+        'm_ncdm':0.02,
+        'z_max_pk' : 4.66,
+        'P_k_max_h/Mpc' : 50.,                 
+        'halofit_k_per_decade' : 80.,
+        'halofit_sigma_precision' : 0.05
+    }
+    class_dict_lin = class_dict_def.copy()
+    class_dict_lin['non_linear'] = 'none'
+    
+    return class_dict_lin
+
+
+As_arr = []
+k_pivot = 0.05 # default CLASS 
+# As := Exp[ln(P_primodial(k=k_pivot))]
+for ic, cosmo in enumerate(cosmologies):
+    if ic%100 == 0:
+        print(f"Cosmo[{ic}]...")
+
+    params_lin = make_class_dict(cosmo)
+    class_module_lin = Class()
+    class_module_lin.set(params_lin)
+    class_module_lin.compute()
+    
+    pk_primo = class_module_lin.get_primordial()  #
+    spline = itp.splrep(pk_primo['k [1/Mpc]'], pk_primo['P_scalar(k)'])
+    As = itp.splev(k_pivot, spline).item()*1e9
+    As_arr.append(As)
+    
+    class_module_lin.struct_cleanup()
+    class_module_lin.empty()
+
+"""
+sig8_arr = []
+for ic, cosmo in enumerate(new_cosmo):
+    if ic%100 == 0:
+        print(f"Cosmo[{ic}]...")
+
+    params_lin  = make_class_dict(cosmo)
+    #print(f"omega_b[{ic}]=",params_lin['Omega_b']*params_lin['h']**2)
+    
+    class_module_lin = Class()
+    class_module_lin.set(params_lin)
+    class_module_lin.compute()
+    
+    sig8 = class_module_lin.sigma8()
+    sig8_arr.append(sig8)
+    
+    class_module_lin.struct_cleanup()
+    class_module_lin.empty()
+"""
+
+
+def emu2jc(theta):
+    Omega_c_emu, Omega_b_emu, sigma8_emu, n_s_emu, h_emu = theta 
+    
+    return jc.Cosmology(Omega_c=Omega_c_emu, 
+                 Omega_b=Omega_b_emu, 
+                 h=h_emu, 
+                 n_s=n_s_emu,
+                 sigma8=sigma8_emu,   
+                 Omega_k=0.,
+                 w0=-1.0,
+                 wa=0.0)
+
+
+omega_c_arr = []
+omega_b_arr = []
+Omega_c_arr = []
+Omega_b_arr = []
+h_arr = []
+sigma8_arr = []
+Omega_m_arr = []
+Omega_de_arr = []
+ns_arr = []
+for ic, cosmo in enumerate(new_cosmo):
+    if ic%100 == 0:
+        print(f"Cosmo[{ic}]...")
+#####    cosmo[2] = sig8_arr[ic]         ######## 
+    cosmo_jc = emu2jc(cosmo)
+    omega_c_arr.append(cosmo_jc.Omega_c * cosmo_jc.h**2)
+    omega_b_arr.append(cosmo_jc.Omega_b * cosmo_jc.h**2)
+    Omega_c_arr.append(cosmo_jc.Omega_c)
+    Omega_b_arr.append(cosmo_jc.Omega_b)
+    h_arr.append(cosmo_jc.h)
+    ns_arr.append(cosmo_jc.n_s)
+    sigma8_arr.append(cosmo_jc.sigma8)
+    Omega_m_arr.append(cosmo_jc.Omega_m)
+    Omega_de_arr.append(cosmo_jc.Omega_de)
+
+# +
+mpl.rc('image', cmap='jet')
+mpl.rcParams['font.size'] = 14
+fig,axs=plt.subplots(2,5,figsize=(17,10), gridspec_kw={"wspace":0.35})
+
+n,_,_=axs[0,0].hist(Omega_c_arr, bins=50, density=True);
+axs[0,0].set_xlabel("$\Omega_c$");
+omega_c_fidu=0.12
+h_fidu=0.67
+Omega_c_fidu = omega_c_fidu/h_fidu**2
+axs[0,0].plot([Omega_c_fidu,Omega_c_fidu],[0,np.max(n)],c='r',ls="--",lw=3)
+
+n,_,_=axs[0,1].hist(Omega_b_arr, bins=50, density=True);
+axs[0,1].set_xlabel("$\Omega_b$");
+omega_b_fidu=0.022
+Omega_b_fidu = omega_b_fidu/h_fidu**2
+axs[0,1].plot([Omega_b_fidu,Omega_b_fidu],[0,np.max(n)],c='r',ls="--",lw=3)
+
+n,_,_=axs[0,2].hist(sigma8_arr, bins=50, density=True);
+axs[0,2].set_xlabel("$\sigma_8$");
+sigma8_fidu=0.81
+axs[0,2].plot([sigma8_fidu,sigma8_fidu],[0,np.max(n)],c='r',ls="--",lw=3)
+
+
+n,_,_=axs[0,3].hist(h_arr, bins=50, density=True);
+axs[0,3].set_xlabel("$h$");
+axs[0,3].plot([h_fidu,h_fidu],[0,np.max(n)],c='r',ls="--",lw=3)
+
+n,_,_=axs[0,4].hist(ns_arr, bins=50, density=True);
+axs[0,4].set_xlabel("$n_s$");
+ns_fidu = 0.96
+axs[0,4].plot([ns_fidu,ns_fidu],[0,np.max(n)],c='r',ls="--",lw=3)
+
+
+axs[1,0].hist(omega_c_arr, bins=50, density=True);
+axs[1,0].set_xlabel("$\omega_c$");
+axs[1,1].hist(omega_b_arr, bins=50, density=True);
+axs[1,1].set_xlabel("$\omega_b$");
+
+axs[1,2].hist(Omega_m_arr, bins=50, density=True);
+axs[1,2].set_xlabel("$\Omega_m$");
+axs[1,3].hist(Omega_de_arr, bins=50, density=True);
+axs[1,3].set_xlabel("$\Omega_{de}$");
+
+##axs[1,4].hist(As_arr, bins=50, density=True);
+#axs[1,4].hist(new_cosmo[:,2], bins=50, density=True)
+##axs[1,4].set_xlabel("$10^{-9}A_s$");
+##axs[1,4].set_xscale("log")
+
+hist, bins = np.histogram(As_arr, bins=50, density=True)
+logbins = np.logspace(np.log10(bins[0]),np.log10(bins[-1]),len(bins))
+axs[1,4].hist(As_arr, bins=logbins)
+axs[1,4].set_xlabel("$10^{-9}A_s$");
+axs[1,4].set_xscale("log")
+# -
 
 
