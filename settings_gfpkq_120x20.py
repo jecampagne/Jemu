@@ -25,7 +25,7 @@ if not neutrino:
 zmin = 0.0
 
 # maximum redshift
-zmax = 4.66
+zmax = 3.5         # version > 19thJune22 was 4.66
 
 # maximum of k (for quick CLASS run, set to for example, 50)
 k_max_h_by_Mpc_TrainingMaker = 5000.
@@ -48,21 +48,24 @@ nz = 20
 
 # choose which cosmological parameters to marginalise over
 # first 5 are by default
+
+#JEC version>19thJune22 Omega_c & Omega_b instead of omega_c, omega_b
+
 if neutrino:
 
     # list of cosmological parameters to use
     # we suggest keeping this order since the emulator inputs are in the same order
     if sigma8:
-        cosmology = ['omega_cdm', 'omega_b', 'sigma8', 'n_s', 'h', 'M_tot']
+        cosmology = ['Omega_cdm', 'Omega_b', 'sigma8', 'n_s', 'h', 'M_tot']
     else:
-        cosmology = ['omega_cdm', 'omega_b', 'ln10^{10}A_s', 'n_s', 'h', 'M_tot']
+        cosmology = ['Omega_cdm', 'Omega_b', 'ln10^{10}A_s', 'n_s', 'h', 'M_tot']
 
 
 else:
     if sigma8:
-        cosmology = ['omega_cdm', 'omega_b', 'sigma8', 'n_s', 'h']
+        cosmology = ['Omega_cdm', 'Omega_b', 'sigma8', 'n_s', 'h']
     else:
-        cosmology = ['omega_cdm', 'omega_b', 'ln10^{10}A_s', 'n_s', 'h']
+        cosmology = ['Omega_cdm', 'Omega_b', 'ln10^{10}A_s', 'n_s', 'h']
 
 
 # -----------------------------------------------------------------------------

@@ -785,5 +785,9 @@ axs[1,4].hist(As_arr, bins=logbins)
 axs[1,4].set_xlabel("$10^{-9}A_s$");
 axs[1,4].set_xscale("log")
 # -
+new_cosmo
+
+
+np.savez(root_dir+"/trainingset/"+"cosmologies_Omega_sig8.npz",new_cosmo)
 
 
