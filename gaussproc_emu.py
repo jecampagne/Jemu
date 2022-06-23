@@ -14,7 +14,7 @@ import jaxopt
 import jax.numpy as jnp
 import jax.scipy as jsc
 from jax import vmap, jit
-jax.config.update("jax_enable_x64", True)
+#jax.config.update("jax_enable_x64", True)
 
 from transformation import *
 from helper import *

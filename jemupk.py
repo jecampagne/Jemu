@@ -6,7 +6,8 @@ import util as ut              # utility function
 # Simple non zero mean Gaussian Process class adapted for the emulator
 from gaussproc_emu import *
 
-
+from jax import jit
+from functools import partial
 #########
 # JEC version > 9 June 2022
 #
@@ -14,6 +15,8 @@ from gaussproc_emu import *
 # using:
 # D(k_i,z_j):= Pk Linear(k_i,z_j)/ Pk Linear(k_i,z=0)
 # Pk Linear(k_i,z=0),
+# Q(k_i,z_j) := Pk Non Linear(k_i,z_j)/ Pk Non Linear(k_i,z=0)
+# Pk Non Linear(k_i,z=0),
 
 # z_j & k_i in train param
 #########
@@ -192,8 +195,13 @@ class JemuPk():
         """ 
             From jax-cosmo.core.Cosmology to emulator parameters
         """
-        return jnp.array([cosmo.Omega_c * (cosmo.h**2),
-                                  cosmo.Omega_b * (cosmo.h**2),
+        #return jnp.array([cosmo.Omega_c * (cosmo.h**2),
+        #                          cosmo.Omega_b * (cosmo.h**2),
+        #                          cosmo.sigma8,
+        #                          cosmo.n_s,
+        #                          cosmo.h])
+        return jnp.array([cosmo.Omega_c,
+                                  cosmo.Omega_b,
                                   cosmo.sigma8,
                                   cosmo.n_s,
                                   cosmo.h])
@@ -221,7 +229,7 @@ class JemuPk():
         interp_pl = interp_pl.reshape(z_star.shape[0],k_star.shape[0])
 
         return interp_pl.squeeze()    # Care: shape (Nz, Nk) 
-    
+
     def nonlinear_pk(self, cosmo, k_star, z_star=0.0):
         
         
@@ -236,7 +244,7 @@ class JemuPk():
         k_star_g, z_star_g = jnp.meshgrid(k_star, z_star)
         k_star_flat = k_star_g.reshape((-1,))
         z_star_flat = z_star_g.reshape((-1,))
-        interp_pnl   = ut.interp2d(k_star_flat,z_star_flat,self.k_train,self.z_train,pred_pnl)
+        interp_pnl = ut.interp2d(k_star_flat,z_star_flat,self.k_train,self.z_train,pred_pnl)
         interp_pnl = interp_pnl.reshape(z_star.shape[0],k_star.shape[0])
         
         return interp_pnl.squeeze()

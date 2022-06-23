@@ -57,20 +57,17 @@ dump = True
 if st.sigma8:
     #############
     # Load cosmological parameter sets
-    # Omega_cdm h^2, Omega_b h^2, sigma8, ns, h
+    # Omega_cdm, Omega_b, sigma8, ns, h
     ###########
-    cosmologies = hp.load_arrays(root_dir + 'trainingset','cosmologies_sig8')
+    dircosmo = root_dir + 'trainingset'
+    cosmologies = hp.load_arrays(dircosmo,'cosmologies_Omega_sig8')
+
     tag="sigma8"
 
     if dump:
         print("0)",cosmologies)
 else:
-    #############
-    # Load cosmological parameter sets
-    # Omega_cdm h^2, Omega_b h^2, ln10^10As, ns, h
-    ###########
-    cosmologies = hp.load_arrays(root_dir + 'trainingset', 'cosmologies_As')
-    tag="As"
+    raise NotImplementedError("As cosmo: No more in use")
 
 print(f"Cosmo[{tag}]: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
 
@@ -81,11 +78,13 @@ print(f"Transformation of y_tain: {st.gf_args}")
 print(f"outputs are centred on zero: {st.use_mean}")
 print(f"noise covariance matrix: {st.var}")
 print(f"Matrix diag term for stability: { st.jitter}")
+print(f"z range [{st.zmin}, {st.zmax}]")
+print(f"k range [{st.k_max_h_by_Mpc}, {st.k_min_h_by_Mpc}]")
 
 
 #########
 if st.sigma8:
-    dirName = root_dir + 'trainingset/components_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
+    dirName = root_dir + 'trainingset/components_Omega_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
     growth_factor_kscale = hp.load_arrays(dirName, 'growth_factor_kscale')
 else:
     raise NotImplementedError("not yet avaliable")
@@ -97,7 +96,7 @@ print(f"Growth (k-scale) Fact: nber of training points {growth_factor_kscale.sha
 n_gf = growth_factor_kscale.shape[1]
 print(f"The number of GPs to model Growth={n_gf} (= nber of k,z bins")
 if  st.sigma8:
-    folder_gf = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_' + str(st.nk) + "x" + str(st.nz) +  '_Matern12' + '/gf_kscale'
+    folder_gf = root_dir + '/pknl_components' + st.d_one_plus +'_Omega_sig8_' + str(st.nk) + "x" + str(st.nz) +  '_Matern12' + '/gf_kscale'
 else:
     raise NotImplementedError("not yet avaliable")
 

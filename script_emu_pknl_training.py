@@ -56,14 +56,10 @@ dump = True
 if st.sigma8:
     #############
     # Load cosmological parameter sets
-    # Omega_cdm h^2, Omega_b h^2, sigma8, ns, h
+    # Omega_cdm, Omega_b, sigma8, ns, h
     ###########
-    dircosmo = root_dir + 'trainingset/components_sig8_120x20'
-    fncosmo  = 'cosmo_validated'
-    print(f">>>> Cosmology in <{dircosmo}/{fncosmo}>")
-    
-    cosmologies = hp.load_arrays(dircosmo,fncosmo)
-    ### cosmologies = hp.load_arrays(root_dir + 'trainingset','cosmologies_sig8')
+    dircosmo = root_dir + 'trainingset'
+    cosmologies = hp.load_arrays(dircosmo,'cosmologies_Omega_sig8')
 
     tag="sigma8"
 
@@ -71,12 +67,8 @@ if st.sigma8:
     if dump:
         print("0)",cosmologies)
 else:
-    #############
-    # Load cosmological parameter sets
-    # Omega_cdm h^2, Omega_b h^2, ln10^10As, ns, h
-    ###########
-    cosmologies = hp.load_arrays(root_dir + 'trainingset', 'cosmologies_As')
-    tag="As"
+    raise NotImplementedError("As cosmo: No more in use")
+
 
 
 print(f"Cosmo[{tag}]: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
@@ -87,11 +79,13 @@ print(f"Transformation of y_tain: {st.gf_args}")
 print(f"outputs are centred on zero: {st.use_mean}")
 print(f"noise covariance matrix: {st.var}")
 print(f"Matrix diag term for stability: { st.jitter}")
+print(f"z range [{st.zmin}, {st.zmax}]")
+print(f"k range [{st.k_max_h_by_Mpc}, {st.k_min_h_by_Mpc}]")
 
 
 #########
 if st.sigma8:
-    dirName = root_dir + 'trainingset/components_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
+    dirName = root_dir + 'trainingset/components_Omega_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
     pk_nl = hp.load_arrays(dirName, 'pk_nl')
 else:
     raise NotImplementedError("not yet avaliable")
@@ -102,7 +96,7 @@ assert n_pnl == st.nk, "Hummm something strange..."
 print(f"The number of GPs to model Pk NLin={n_pnl} (= nber of k_bins) ")
 
 if  st.sigma8:
-    folder_pnl = root_dir + '/pknl_components' + st.d_one_plus +'_sig8_' + str(st.nk) + "x" + str(st.nz) +  '_RBF' + '/pnl'
+    folder_pnl = root_dir + '/pknl_components' + st.d_one_plus +'_Omega_sig8_' + str(st.nk) + "x" + str(st.nz) +  '_RBF' + '/pnl'
 else:
     raise NotImplementedError("not yet avaliable")
     

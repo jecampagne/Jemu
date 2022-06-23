@@ -1,3 +1,5 @@
+import sys
+
 from timeit import default_timer as timer
 
 import numpy as np
@@ -50,27 +52,29 @@ def make_class_dict(cosmo, sigma8=True):
     class_dict_def['m_ncdm'] = st.fixed_nm['M_tot']/class_dict_def['deg_ncdm']
 
 
-    class_dict_lin = class_dict_def.copy()
-    class_dict_lin['non_linear'] = 'none'
+#    class_dict_lin = class_dict_def.copy()
+#    class_dict_lin['non_linear'] = 'none'
     class_dict_nl = class_dict_def.copy()
     class_dict_nl['non_linear'] = 'halofit'
     
-    return class_dict_lin, class_dict_nl
+    return class_dict_nl
 
 ################################
 if __name__ == "__main__":
 
     #############
+    
 
     root_dir = "./"
 
-    dump = True  ### debug ####
+    dump = False  ### debug ####
     if dump:
         print("################")
         print("################")
         print("##### DUMP #####")
         print("################")
         print("################")
+
 
     if st.sigma8:
         #############
@@ -87,6 +91,20 @@ if __name__ == "__main__":
 
     print(f"Cosmo[{tag}]: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
         
+    if len(sys.argv) >= 2:
+        ifirst_cosmo = int(sys.argv[1])
+    else:
+        ifirst_cosmo = 0
+
+    if len(sys.argv) >= 3:
+        ilast_cosmo = int(sys.argv[2])
+    else:
+        ilast_cosmo = cosmologies.shape[0]
+
+
+    if dump:
+        print(f"cosmo index:[{ifirst_cosmo}, {ilast_cosmo}]")
+
 
     all_pklin0  = []
     all_pknl0         = []
@@ -104,12 +122,12 @@ if __name__ == "__main__":
     print("Start....")
     start = timer()
     cosmo_validated =[]
-    for ic in range(cosmologies.shape[0]):
+    for ic in range(ifirst_cosmo,ilast_cosmo):
 
         cosmo = cosmologies[ic]
         
         if dump:
-            assert ic==0, "End of dump"
+            assert ic==ifirst_cosmo, "End of dump"
 
         tries = 3
         for it in range(tries):
@@ -117,12 +135,12 @@ if __name__ == "__main__":
                 print(f"Cosmo[{ic}]:",cosmo)
                 start_cur = timer()
 
-                params_lin, params_nl = make_class_dict(cosmo)
+                params_nl = make_class_dict(cosmo)
 
-                #Prepare CLASS for Linear Pk
-                class_module_lin = Class()
-                class_module_lin.set(params_lin)
-                class_module_lin.compute()
+#                #Prepare CLASS for Linear Pk
+#                class_module_lin = Class()
+#                class_module_lin.set(params_lin)
+#                class_module_lin.compute()
 
                 #Prepare CLASS for Non Linear Pk
                 class_module_nl = Class()
@@ -141,7 +159,8 @@ if __name__ == "__main__":
         cosmo_validated.append(cosmo)
 
         # Compute Pk linear at zref Plin(k,zref) and compute the Growth D(z) = P(kref,z)/P(kref,zref) , zref=0
-        pklin0 = np.array([class_module_lin.pk_lin(k_g[k] * params_lin['h'], zref) for k in range(st.nk)])
+        #pklin0 = np.array([class_module_lin.pk_lin(k_g[k] * params_lin['h'], zref) for k in range(st.nk)])
+        pklin0 = np.array([class_module_nl.pk_lin(k_g[k] * params_nl['h'], zref) for k in range(st.nk)])
 
         # Define D(k,z) =  P(k,z)/P(k,zref)      new 8/6/22 
         pklin_grid = class_module_nl.get_pk_all(k_g*params_nl['h'],z_g, nonlinear=False)
@@ -173,7 +192,7 @@ if __name__ == "__main__":
         q_func_bis = pknl / pknl0.reshape(st.nk,1) - 1
 
         if dump:
-            print("4)",q_func.shape,q_func_bis.shape)
+            print("4)",q_func_bis.shape)
         
         
         #store
@@ -182,9 +201,25 @@ if __name__ == "__main__":
         all_pknl0.append(pknl0.flatten())                  # new 8/6/22
         all_qfunc_bis.append(q_func_bis.flatten())         # new 8/6/22
 
+        
+        #temporary storage
+        dirName =  root_dir + 'trainingset/components_tmp_' + str(ifirst_cosmo)+ "/" 
+        fn_pklin = 'pk_linear'
+        fn_pknl = 'pk_nl'
+        fn_growth_kscale = 'growth_factor_kscale'
+        fn_q_func_bis = 'q_function_bis'
+
+        hp.store_arrays(all_pklin0,  dirName, fn_pklin)
+        hp.store_arrays(all_growth_kscale, dirName, fn_growth_kscale)
+        hp.store_arrays(all_pknl0, dirName, fn_pknl)
+        hp.store_arrays(all_qfunc_bis, dirName, fn_q_func_bis)
+        hp.store_arrays(cosmo_validated,dirName, 'cosmo_validated')
+
+
+
         # Clean CLASS memory
-        class_module_lin.struct_cleanup()
-        class_module_lin.empty()
+#        class_module_lin.struct_cleanup()
+#        class_module_lin.empty()
         class_module_nl.struct_cleanup()
         class_module_nl.empty()
 

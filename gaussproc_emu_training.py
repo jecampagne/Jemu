@@ -613,94 +613,94 @@ class GPEmuTraining(GPEmuBase):
                 )
 
                 
+## DEPRECATED ###########
+## class GPEmu(GPEmuBase):
+##     def __init__(self,
+##             kernel: Callable[[jnp.ndarray, 
+##                               jnp.ndarray, 
+##                               Dict[str, jnp.ndarray], 
+##                               float, float],jnp.ndarray] = kernel_RBF,
+##             order: int = 2,
+##             x_trans: bool = True,
+##             y_trans: bool = False,
+##             use_mean: bool = False) -> None:
+        
+##         super().__init__(kernel,order,x_trans,y_trans,use_mean)
 
-class GPEmu(GPEmuBase):
-    def __init__(self,
-            kernel: Callable[[jnp.ndarray, 
-                              jnp.ndarray, 
-                              Dict[str, jnp.ndarray], 
-                              float, float],jnp.ndarray] = kernel_RBF,
-            order: int = 2,
-            x_trans: bool = True,
-            y_trans: bool = False,
-            use_mean: bool = False) -> None:
         
-        super().__init__(kernel,order,x_trans,y_trans,use_mean)
-
+##     def load_info(self, folder_name: str, file_name: str)->None:
+##         """
+##         load info for prediction only
+##         """
         
-    def load_info(self, folder_name: str, file_name: str)->None:
-        """
-        load info for prediction only
-        """
+##         fname = folder_name + '/' + file_name + '.npz'
         
-        fname = folder_name + '/' + file_name + '.npz'
-        
-        data = np.load(fname, allow_pickle=True)
-        self.x_train    = data["x_train"]
-        ###self.y_train    = data["y_train"]   #not really necessary
-        self.mean_theta = data['mean_theta']
-        self.x_trans    = data['x_trans'][0]
-        self.y_trans    = data['y_trans'][0]
-        self.kernel_hat = data["kernel_hat"].item()
+##         data = np.load(fname, allow_pickle=True)
+##         self.x_train    = data["x_train"]
+##         ###self.y_train    = data["y_train"]   #not really necessary
+##         self.mean_theta = data['mean_theta']
+##         self.x_trans    = data['x_trans'][0]
+##         self.y_trans    = data['y_trans'][0]
+##         self.kernel_hat = data["kernel_hat"].item()
        
-        self.beta_hat      = data["beta_hat"]
-        self.kinv_XX_res   = data["kinv_XX_res"]
-        self.mean_function = data["mean_function"]
-        mu_matrix       = data['mu_matrix']
-        self.transform  = transformation(
-            jnp.zeros(shape=(self.beta_hat.shape[0]+1,
-                             self.beta_hat.shape[0])),
-                            jnp.zeros(shape=(self.beta_hat.shape[0]+1,1))) #fake
+##         self.beta_hat      = data["beta_hat"]
+##         self.kinv_XX_res   = data["kinv_XX_res"]
+##         self.mean_function = data["mean_function"]
+##         mu_matrix       = data['mu_matrix']
+##         self.transform  = transformation(
+##             jnp.zeros(shape=(self.beta_hat.shape[0]+1,
+##                              self.beta_hat.shape[0])),
+##                             jnp.zeros(shape=(self.beta_hat.shape[0]+1,1))) #fake
 
-        self.transform.mu_matrix = mu_matrix
-        self.transform.y_min = data['y_min'][0]
-
-    
-    def simple_predict(self, theta_star: jnp.ndarray) -> jnp.ndarray:
-        """
-        theta_star: a vector of new theta values (N*,d)
-        
-        Make prediction after optimization
-        y_\ast = \Phi_\ast \hat{\beta} 
-                + \hat{k_\ast}^T \hat{K_y}^{-1} (y_train - \Phi(X_train)\hat{\beta})        
-        """
-
-        if self.kinv_XX_res is None:
-            msg = 'kinv_XX_res is not set...'
-            raise RuntimeError(msg)
-
-        x_star = theta_star - self.mean_theta  # shift computed at training phase  (mean_theta is a mtx)
-        if self.x_trans: # use the whitening transform computed at training phase
-            x_star = self.transform.x_transform_test(x_star)        
-        
-        phi_star = self.compute_basis(x_star)   # (N* x m)
-        
-        #jitted helper
-        return _simple_predict(self.kernel,
-                               x_star,
-                               phi_star,
-                               self.x_train,
-                               self.kernel_hat,
-                               self.beta_hat,
-                               self.kinv_XX_res, 
-                               self.mean_function)
+##         self.transform.mu_matrix = mu_matrix
+##         self.transform.y_min = data['y_min'][0]
 
     
-    def pred_original_function(self, theta_star: jnp.ndarray) -> jnp.ndarray:
-        '''
-        Calculates the original function if the log_10 transformation is used on the target.
-        :param: theta_star (np.ndarray) - the test point in parameter space
+##     def simple_predict(self, theta_star: jnp.ndarray) -> jnp.ndarray:
+##         """
+##         theta_star: a vector of new theta values (N*,d)
+        
+##         Make prediction after optimization
+##         y_\ast = \Phi_\ast \hat{\beta} 
+##                 + \hat{k_\ast}^T \hat{K_y}^{-1} (y_train - \Phi(X_train)\hat{\beta})        
+##         """
 
-        :return: y_original (np.ndarray) - the predicted function in the linear scale (original space) is returned
-        '''
+##         if self.kinv_XX_res is None:
+##             msg = 'kinv_XX_res is not set...'
+##             raise RuntimeError(msg)
 
-        if not self.y_trans:
-            msg = 'You must transform the target in order to use this function'
-            raise RuntimeWarning(msg)
+##         x_star = theta_star - self.mean_theta  # shift computed at training phase  (mean_theta is a mtx)
+##         if self.x_trans: # use the whitening transform computed at training phase
+##             x_star = self.transform.x_transform_test(x_star)        
+        
+##         phi_star = self.compute_basis(x_star)   # (N* x m)
+        
+##         #jitted helper
+##         return _simple_predict(self.kernel,
+##                                x_star,
+##                                phi_star,
+##                                self.x_train,
+##                                self.kernel_hat,
+##                                self.beta_hat,
+##                                self.kinv_XX_res, 
+##                                self.mean_function)
+
+    
+##     def pred_original_function(self, theta_star: jnp.ndarray) -> jnp.ndarray:
+##         '''
+##         Calculates the original function if the log_10 transformation is used on the target.
+##         :param: theta_star (np.ndarray) - the test point in parameter space
+
+##         :return: y_original (np.ndarray) - the predicted function in the linear scale (original space) is returned
+##         '''
+
+##         if not self.y_trans:
+##             msg = 'You must transform the target in order to use this function'
+##             raise RuntimeWarning(msg)
 
             
         
 
-        mu = self.simple_predict(theta_star)
-        y_original = self.transform.y_inv_transform_test(mu)
-        return y_original
+##         mu = self.simple_predict(theta_star)
+##         y_original = self.transform.y_inv_transform_test(mu)
+##         return y_original
