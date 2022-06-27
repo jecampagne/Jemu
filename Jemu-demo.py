@@ -76,9 +76,6 @@ emu = JemuPk(param_emu)
 
 jc.Planck15()
 
-# +
-#cosmo_jc = jc.Planck15(h=0.7, Omega_c=0.2, Omega_b=0.055, sigma8=0.75)
-
 cosmo_jc = jc.Planck15()
 
 # + tags=[]
@@ -100,11 +97,18 @@ cosmo_ccl
 cosmo_jax = jc.Cosmology(Omega_c=Omega_c_emu, Omega_b=Omega_b_emu, 
     h=h_emu, sigma8=sigma8_emu, n_s=n_s_emu, Omega_k=0.0, w0=-1.0,wa=0.0)
 
+from timeit import default_timer as timer
+
+
+start = timer()
 Nk=10*st.nk 
 k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.k_max_h_by_Mpc, Nk, endpoint=True) #h/Mpc
 z_star = jnp.array([0.,1., 2., 3.])
 pk_linear_interp = emu.linear_pk(cosmo_jax, k_star,z_star)
 pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star)
+end = timer()
+print("end-start (sec)",end - start)
+
 
 pk_linear_interp.shape, pk_nonlin_interp.shape
 

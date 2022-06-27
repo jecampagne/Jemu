@@ -134,7 +134,6 @@ class JemuPk():
 
         return gps_gf, gps_pl, gps_pnl, gps_qf
     
-    
     def _gp_kzgrid_pred_linear(self,theta_star):
         """
             Predict GPs at the (k_i,z_j) 'i,j' in nk x nz grid
@@ -162,7 +161,7 @@ class JemuPk():
 
         return pred_pl
         
-        
+    
     def _gp_kzgrid_pred_nlinear(self,theta_star):
         """
             Predict GPs at the (k_i,z_j) 'i,j' in nk x nz grid
@@ -187,7 +186,7 @@ class JemuPk():
         # Non Linear Pk @ k_i, z_j
         pred_pnl =  pred_pnl_z0[:,jnp.newaxis] * pred_qf     # the shape is (Nk, Nz)
 
-        return pred_pnl_z0, pred_qf, pred_pnl
+        return pred_pnl
     
     
     
@@ -239,7 +238,7 @@ class JemuPk():
         z_star = jnp.atleast_1d(z_star)
         k_star = jnp.atleast_1d(k_star)
 
-        _,_,pred_pnl = self._gp_kzgrid_pred_nlinear(theta_star)
+        pred_pnl = self._gp_kzgrid_pred_nlinear(theta_star)
 
         k_star_g, z_star_g = jnp.meshgrid(k_star, z_star)
         k_star_flat = k_star_g.reshape((-1,))
@@ -247,4 +246,4 @@ class JemuPk():
         interp_pnl = ut.interp2d(k_star_flat,z_star_flat,self.k_train,self.z_train,pred_pnl)
         interp_pnl = interp_pnl.reshape(z_star.shape[0],k_star.shape[0])
         
-        return interp_pnl.squeeze()
+        return interp_pnl.squeeze()  # Care: shape (Nz, Nk) 
