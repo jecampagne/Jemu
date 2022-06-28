@@ -14,12 +14,18 @@
 # ---
 
 # +
-import numpy as np
+import os
+os.environ['XLA_PYTHON_CLIENT_PREALLOCATE']='false'
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.50'
 
+
+import numpy as np
+import jax
+import jax.numpy as jnp
 from classy import Class    # CLASS python
 import jax_cosmo as jc      # Jax-cosmo lib
 import pyccl as ccl         # CCL python
-from jemupk import *        # Jax Emulator of CLASS
+import jemupk_experimental  as emu  # Jax Emulator of CLASS
 # -
 
 import matplotlib as mpl
@@ -33,33 +39,6 @@ import settings_gfpkq_120x20  as st         # configuration file (update 2/June/
 print(f"(k,z)-grid: {st.nk}x{st.nz}")
 
 # +
-# Set emulator parameters
-param_emu = {}
-
-param_emu['kernel_pklin'] = kernel_RBF
-param_emu['kernel_pknl']  = kernel_RBF
-param_emu['kernel_gf_kscale'] = kernel_Matern12
-param_emu['kernel_qfunc_bis'] = kernel_Matern12
-
-param_emu['zmin'] = st.zmin
-param_emu['zmax'] = st.zmax
-param_emu['nz']   = st.nz
-
-param_emu['kmin'] = st.k_min_h_by_Mpc
-param_emu['kmax'] = st.k_max_h_by_Mpc
-param_emu['nk']   = st.nk
-
-param_emu['order'] = st.order
-param_emu['x_trans'] = st.x_trans
-
-param_emu['gf_kscale_y_trans'] = st.gf_scale_args['y_trans']
-param_emu['pl_y_trans'] = st.pl_args['y_trans']
-param_emu['pnl_y_trans']       = st.pnl_args['y_trans']
-param_emu['qf_bis_y_trans']    = st.qf_bis_args['y_trans']
-
-
-param_emu['use_mean'] = st.use_mean
-
 root_dir = "./"
 if st.sigma8:
     print("Using: Omega_cdm, Omega_b, sigma8, ns, h")
@@ -67,12 +46,11 @@ if st.sigma8:
 else:
     raise NotImplementedError("No more in use")
 
-param_emu['load_dir'] = root_dir + '/pknl_components' + st.d_one_plus+tag
+load_dir = root_dir + '/pknl_components' + st.d_one_plus+tag
 # -
 
-param_emu
-
-emu = JemuPk(param_emu)
+# load GP material
+gp_factory = emu.GP_factory.make(load_dir)
 
 jc.Planck15()
 
@@ -97,18 +75,15 @@ cosmo_ccl
 cosmo_jax = jc.Cosmology(Omega_c=Omega_c_emu, Omega_b=Omega_b_emu, 
     h=h_emu, sigma8=sigma8_emu, n_s=n_s_emu, Omega_k=0.0, w0=-1.0,wa=0.0)
 
-from timeit import default_timer as timer
+# # Test multi redshifts Pk computations
 
-
-start = timer()
 Nk=10*st.nk 
 k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.k_max_h_by_Mpc, Nk, endpoint=True) #h/Mpc
 z_star = jnp.array([0.,1., 2., 3.])
-pk_linear_interp = emu.linear_pk(cosmo_jax, k_star,z_star)
-pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star)
-end = timer()
-print("end-start (sec)",end - start)
 
+pk_linear_interp = emu.linear_pk(cosmo_jax, k_star,z_star)
+
+pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star) 
 
 pk_linear_interp.shape, pk_nonlin_interp.shape
 
@@ -249,8 +224,7 @@ axs[1].set_title(f"Pk NLin: Relative diff. wrt CLASS (z={z_ccl:.2f})");
 # # Jacobians & vectorization
 
 
-jc_func_nl = lambda p: jc.power.nonlinear_matter_power(p,k_star, 
-                                               1./(1+z_ccl))/p.h**3
+jc_func_nl = lambda p: jc.power.nonlinear_matter_power(p,k_star, 1./(1+z_ccl))/p.h**3
 jac_jc_func_nl = jax.jacfwd(jc_func_nl)(cosmo_jax)
 
 func_nl = lambda p: emu.nonlinear_pk(p,k_star, z_star=z_ccl)
@@ -269,7 +243,7 @@ for i,jaco in enumerate([jac_nonlin_emu, jac_jc_func_nl]):
     plt.plot(k_star,jaco.Omega_c,label="Omega_c",c=colors[i],ls=lines[i])
     plt.plot(k_star,jaco.n_s,label="n_s",c=colors[i],ls=lines[i])
     if i == 0:
-        ax.legend();
+        plt.legend();
 plt.xlabel(r"$k\ [h\ Mpc^{-1}]$")
 plt.xscale("log")
 plt.title(titles)

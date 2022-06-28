@@ -24,6 +24,9 @@ from functools import partial
 from typing import NamedTuple, Any
 import settings_gfpkq_120x20  as st         # configuration file (update 2/June/22)
 
+
+import concurrent.futures  # JEC 27/6/22
+
 class JemuSettings(NamedTuple):
     kernel_pklin : Any = kernel_RBF
     kernel_pknl : Any = kernel_RBF
@@ -45,6 +48,7 @@ class JemuSettings(NamedTuple):
 jemu_st = JemuSettings()
 
 # Gauss Process factory
+
 class GP_factory():
     done = False    # become True when load done
     _ws = {}        # workspace
@@ -53,79 +57,188 @@ class GP_factory():
         
         if not GP_factory.done:
             GP_factory.done = True
-            
-            # Growth factor with k-scale
-            folder_gf = directory + '/gf_kscale'
-            n_gf = jemu_st.nk * jemu_st.nz
-            arg_gf = [[folder_gf, 'gp_' + str(i)] for i in range(n_gf)]
 
-            gps_gf=[]
-            for i_gf in range(n_gf):
+            # Parallel execution with the maximum threads  JEC 28/6/22
+            def load_parallel_gp(loader,n):
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    X = executor.map(loader, range(n))
+                return list(X)
+
+            # Growth factor with k-scale
+            n_gf = jemu_st.nk * jemu_st.nz
+
+            def load_one_gf(i):
+                folder_gf = directory + '/gf_kscale'
+                fname_gf  = 'gp_' + str(i)
                 gf_model = GPEmu(kernel=jemu_st.kernel_gf,
                              order=jemu_st.order,
                              x_trans=jemu_st.x_trans,
                              y_trans=jemu_st.gf_y_trans,
                              use_mean=jemu_st.use_mean)
-                gf_model.load_info(arg_gf[i_gf][0], arg_gf[i_gf][1])
-                gps_gf.append(gf_model)
+                gf_model.load_info(folder_gf, fname_gf)
+                return gf_model
+
+
+            gps_gf = load_parallel_gp(load_one_gf, n_gf)
+ 
 
             # Linear Pk at z=0
-            folder_pl = directory + '/pl'
             n_pl = jemu_st.nk
-            arg_pl = [[folder_pl, 'gp_' + str(i)] for i in range(n_pl)]
-
-            gps_pl=[]
-            for i_pl in range(n_pl):
+            def load_one_pl(i):
+                folder_pl = directory + '/pl'
+                fname_gf  = 'gp_' + str(i)
                 pl_model = GPEmu(kernel=jemu_st.kernel_pklin,
                              order=jemu_st.order,
                              x_trans=jemu_st.x_trans,
                              y_trans=jemu_st.pl_y_trans,
                              use_mean=jemu_st.use_mean)
-                pl_model.load_info(arg_pl[i_pl][0], arg_pl[i_pl][1])
-                gps_pl.append(pl_model)
+                pl_model.load_info(folder_pl, fname_gf)
+                return pl_model
+            
+            gps_pl = load_parallel_gp(load_one_pl, n_pl)
 
 
             # Non Linear Pk at z=0
-            folder_pnl = directory + '/pnl'
             n_pnl = jemu_st.nk
-            arg_pnl = [[folder_pnl, 'gp_' + str(i)] for i in range(n_pnl)]
-
-            gps_pnl=[]
-            for i_pnl in range(n_pnl):
+            def load_one_pnl(i):
+                folder_pnl = directory + '/pnl'
+                fname_gf  = 'gp_' + str(i)
                 pnl_model = GPEmu(kernel=jemu_st.kernel_pknl,
                              order=jemu_st.order,
                              x_trans=jemu_st.x_trans,
                              y_trans=jemu_st.pnl_y_trans,
                              use_mean=jemu_st.use_mean)
-                pnl_model.load_info(arg_pnl[i_pnl][0], arg_pnl[i_pnl][1])
-                gps_pnl.append(pnl_model)
+                pnl_model.load_info(folder_pnl, fname_gf)
+                return pnl_model
 
+            gps_pnl = load_parallel_gp(load_one_pnl, n_pnl)
 
 
             #Q-func bis = Pk_NL(k,z)/Pk_NL(k,z=0)
-            folder_qf = directory + '/qf_bis'
             n_qf = jemu_st.nz * jemu_st.nk
-            arg_qf = [[folder_qf, 'gp_' + str(i)] for i in range(n_qf)]
-
-            gps_qf=[]
-            for i_qf in range(n_qf):
+            def load_one_qf(i):
+                folder_qf = directory + '/qf_bis'
+                fname_gf  = 'gp_' + str(i)
                 qf_model = GPEmu(kernel=jemu_st.kernel_qfunc,
                              order=jemu_st.order,
                              x_trans=jemu_st.x_trans,
                              y_trans=jemu_st.qf_y_trans,          ######
                              use_mean=jemu_st.use_mean)
-                qf_model.load_info(arg_qf[i_qf][0], arg_qf[i_qf][1])
-                gps_qf.append(qf_model)
+                qf_model.load_info(folder_qf, fname_gf)
+                return qf_model
 
-                # Save
-                GP_factory._ws = {"gf": gps_gf, "pl":gps_pl, "pnl":gps_pnl, "qf":gps_qf}
+            gps_qf = load_parallel_gp(load_one_qf, n_qf)
+
+            # Save
+            GP_factory._ws = {"gf": gps_gf, "pl":gps_pl, "pnl":gps_pnl, "qf":gps_qf}
 
         # use worksape
         return GP_factory._ws
 
 
 
-@jit
+## class GP_factory():
+##     done = False    # become True when load done
+##     _ws = {}        # workspace
+##     @classmethod
+##     def make(cls, directory=None):
+        
+##         if not GP_factory.done:
+##             GP_factory.done = True
+            
+##             # Growth factor with k-scale
+## ##             folder_gf = directory + '/gf_kscale'
+## ##             n_gf = jemu_st.nk * jemu_st.nz
+## ##             arg_gf = [[folder_gf, 'gp_' + str(i)] for i in range(n_gf)]
+
+## ##             gps_gf=[]
+## ##             for i_gf in range(n_gf):
+## ##                 gf_model = GPEmu(kernel=jemu_st.kernel_gf,
+## ##                              order=jemu_st.order,
+## ##                              x_trans=jemu_st.x_trans,
+## ##                              y_trans=jemu_st.gf_y_trans,
+## ##                              use_mean=jemu_st.use_mean)
+## ##                 gf_model.load_info(arg_gf[i_gf][0], arg_gf[i_gf][1])
+## ##                 gps_gf.append(gf_model)
+
+##             n_gf = jemu_st.nk * jemu_st.nz
+
+##             def load_one_gf(i):
+##                 folder_gf = directory + '/gf_kscale'
+##                 fname_gf  = 'gp_' + str(i)
+##                 gf_model = GPEmu(kernel=jemu_st.kernel_gf,
+##                              order=jemu_st.order,
+##                              x_trans=jemu_st.x_trans,
+##                              y_trans=jemu_st.gf_y_trans,
+##                              use_mean=jemu_st.use_mean)
+##                 gf_model.load_info(folder_gf, fname_gf)
+##                 return gf_model
+
+##             def load_parallel_gf():
+##                 with concurrent.futures.ThreadPoolExecutor() as executor:
+##                     X = executor.map(load_one_gf, range(n_gf))
+##                 return list(X)
+
+##             gps_gf = load_parallel_gf()
+                                  
+
+##             # Linear Pk at z=0
+##             folder_pl = directory + '/pl'
+##             n_pl = jemu_st.nk
+##             arg_pl = [[folder_pl, 'gp_' + str(i)] for i in range(n_pl)]
+
+##             gps_pl=[]
+##             for i_pl in range(n_pl):
+##                 pl_model = GPEmu(kernel=jemu_st.kernel_pklin,
+##                              order=jemu_st.order,
+##                              x_trans=jemu_st.x_trans,
+##                              y_trans=jemu_st.pl_y_trans,
+##                              use_mean=jemu_st.use_mean)
+##                 pl_model.load_info(arg_pl[i_pl][0], arg_pl[i_pl][1])
+##                 gps_pl.append(pl_model)
+
+
+##             # Non Linear Pk at z=0
+##             folder_pnl = directory + '/pnl'
+##             n_pnl = jemu_st.nk
+##             arg_pnl = [[folder_pnl, 'gp_' + str(i)] for i in range(n_pnl)]
+
+##             gps_pnl=[]
+##             for i_pnl in range(n_pnl):
+##                 pnl_model = GPEmu(kernel=jemu_st.kernel_pknl,
+##                              order=jemu_st.order,
+##                              x_trans=jemu_st.x_trans,
+##                              y_trans=jemu_st.pnl_y_trans,
+##                              use_mean=jemu_st.use_mean)
+##                 pnl_model.load_info(arg_pnl[i_pnl][0], arg_pnl[i_pnl][1])
+##                 gps_pnl.append(pnl_model)
+
+
+
+##             #Q-func bis = Pk_NL(k,z)/Pk_NL(k,z=0)
+##             folder_qf = directory + '/qf_bis'
+##             n_qf = jemu_st.nz * jemu_st.nk
+##             arg_qf = [[folder_qf, 'gp_' + str(i)] for i in range(n_qf)]
+
+##             gps_qf=[]
+##             for i_qf in range(n_qf):
+##                 qf_model = GPEmu(kernel=jemu_st.kernel_qfunc,
+##                              order=jemu_st.order,
+##                              x_trans=jemu_st.x_trans,
+##                              y_trans=jemu_st.qf_y_trans,          ######
+##                              use_mean=jemu_st.use_mean)
+##                 qf_model.load_info(arg_qf[i_qf][0], arg_qf[i_qf][1])
+##                 gps_qf.append(qf_model)
+
+##                 # Save
+##                 GP_factory._ws = {"gf": gps_gf, "pl":gps_pl, "pnl":gps_pnl, "qf":gps_qf}
+
+##         # use worksape
+##         return GP_factory._ws
+
+
+
+#@jit
 def _gp_kzgrid_pred_linear(theta_star):
     """
         Predict GPs at the (k_i,z_j) 'i,j' in nk x nz grid
@@ -156,7 +269,7 @@ def _gp_kzgrid_pred_linear(theta_star):
     return pred_pl
 
 
-@jit
+#@jit
 def _gp_kzgrid_pred_nlinear(theta_star):
     """
         Predict GPs at the (k_i,z_j) 'i,j' in nk x nz grid
