@@ -25,7 +25,7 @@ import jax.numpy as jnp
 from classy import Class    # CLASS python
 import jax_cosmo as jc      # Jax-cosmo lib
 import pyccl as ccl         # CCL python
-import jemupk_experimental  as emu  # Jax Emulator of CLASS
+import jemupk  as emu  # Jax Emulator of CLASS
 # -
 
 import matplotlib as mpl
@@ -227,7 +227,7 @@ axs[1].set_title(f"Pk NLin: Relative diff. wrt CLASS (z={z_ccl:.2f})");
 jc_func_nl = lambda p: jc.power.nonlinear_matter_power(p,k_star, 1./(1+z_ccl))/p.h**3
 jac_jc_func_nl = jax.jacfwd(jc_func_nl)(cosmo_jax)
 
-func_nl = lambda p: emu.nonlinear_pk(p,k_star, z_star=z_ccl)
+func_nl = lambda p: emu.nonlinear_pk(p,k_star, z_star=jnp.array([z_ccl]))
 jac_nonlin_emu = jax.jacfwd(func_nl)(cosmo_jax)
 
 # ### Notice that the emulator has a fixed (Omega_k, w0, wa) values so the gradients are not relevant for these parameters 

@@ -16,9 +16,18 @@
 # +
 import os
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE']='false'
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.10'
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.50'
+
+from timeit import default_timer as timer
 
 import numpy as np
+import jax
+jax.config.update("jax_enable_x64", True)
+
+
+
+import jax.numpy as jnp
+from jax import jit
 import jax_cosmo as jc      # Jax-cosmo lib
 import jax.numpy as jnp
 import jemupk_experimental  as emu      # Jax Emulator of CLASS
@@ -46,11 +55,31 @@ load_dir = root_dir + '/pknl_components' + st.d_one_plus+tag
 # -
 
 #trigger the load
+start=timer()
 gp_factory = emu.GP_factory.make(load_dir)
+end=timer()
+print("load ok after: ",end-start, " sec.")
+
+
 
 cosmo_jax = jc.Planck15()
 
-from timeit import default_timer as timer
+
+
+gps_gf = gp_factory["gf"]
+
+
+@jit
+def f(cosmo):
+    theta_star = emu._builtTheta(cosmo)
+    pred_gf = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_gf[:200] ))
+    return pred_gf
+
+# %time tmp=f(cosmo_jax)
+
+# %time tmp=f(cosmo_jax)
+
+
 
 
 start = timer()
@@ -62,13 +91,16 @@ end = timer()
 print("end-start (sec)",end - start)
 
 
+start = timer()
+pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star)
+end = timer()
+print("end-start (sec)",end - start)
+
 # %timeit emu.linear_pk(cosmo_jax, k_star,z_star).block_until_ready()
 
-# %time  emu.nonlinear_pk(cosmo_jax,k_star, z_star).block_until_ready()  # measure JAX compilation time
+# %time  pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star).block_until_ready()  # measure JAX compilation time
 
 # %timeit emu.nonlinear_pk(cosmo_jax,k_star, z_star).block_until_ready() # measure JAX runtime
-
-pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star)
 
 # +
 # CCL & Jax-cosmo
@@ -80,23 +112,37 @@ z_ccl = z_star[zbin].item()
 print("z_ccl=",z_ccl)
 # -
 
+start = timer()
 pk_lin_jc = jc.power.linear_matter_power(cosmo_jax,k_star, 1./(1+z_ccl))/cosmo_jax.h**3
+end = timer()
+print("end-start (sec)",end - start)
 
+start = timer()
 pk_nonlin_jc = jc.power.nonlinear_matter_power(cosmo_jax,k_star, 
                                                1./(1+z_ccl))/cosmo_jax.h**3
+end = timer()
+print("end-start (sec)",end - start)
+
+np.save("jc_linear_matter_power.npy",pk_lin_jc)
+np.save("jc_nonlinear_matter_power.npy",pk_nonlin_jc)
+
+
+pk_lin_jc = np.load("jc_linear_matter_power.npy")
+pk_nonlin_jc = np.load("jc_nonlinear_matter_power.npy")
 
 # +
+
 plt.figure(figsize=(10,8))
 
 plt.plot(k_star,pk_linear_interp[zbin,:],lw=2, c="b", label="Jemu")
-plt.plot(k_star,pk_lin_jc,lw=2, c="r", label="jax_cosmo")
+plt.plot(k_star,pk_lin_jc,lw=2, c="r", ls='--', label="jax_cosmo")
 #plt.plot(k_star,pk_lin_ccl,lw=2, ls="--", c="lime", label=r"ccl")
 #plt.plot(k_star,pk_class_lin,lw=2, ls=":", c="purple",label="classy")
 
 
 
 plt.plot(k_star,pk_nonlin_interp[zbin],lw=2, c="b")#, label=r"$P_{{nl}}$ (Jemu)")
-plt.plot(k_star,pk_nonlin_jc,lw=2, c="r")#, label=r"$P_{{nl}}$ (jax_cosmo)")
+plt.plot(k_star,pk_nonlin_jc,lw=2, c="r", ls='--')#, label=r"$P_{{nl}}$ (jax_cosmo)")
 #plt.plot(k_star,pk_nonlin_ccl,lw=2, ls="--",c="lime")#,label=r"$P_{{nl}}$ (ccl)")
 #plt.plot(k_star,pk_class_nl,lw=2, ls=":", c="purple")#,label="classy")
 plt.legend()
