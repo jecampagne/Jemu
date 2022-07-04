@@ -2,8 +2,7 @@
 
 import util as ut              # utility function
 # Simple non zero mean Gaussian Process class adapted for the emulator
-from gaussproc_emu_experimental import *
-#from gaussproc_emu import *
+from gaussproc_emu import *
 
 import jax
 jax.config.update("jax_enable_x64", True)
