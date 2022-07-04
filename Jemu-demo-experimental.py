@@ -16,7 +16,8 @@
 # +
 import os
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE']='false'
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.50'
+os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.90'
+#os.environ['XLA_FLAGS']='--xla_gpu_autotune_level=2'
 
 from timeit import default_timer as timer
 
@@ -54,33 +55,20 @@ else:
 load_dir = root_dir + '/pknl_components' + st.d_one_plus+tag
 # -
 
+# report the default number of worker threads on your system
+from concurrent.futures import ThreadPoolExecutor
+# create a thread pool with the default number of worker threads
+executor = ThreadPoolExecutor()
+# report the number of worker threads chosen by default
+print(executor._max_workers)
+
 #trigger the load
 start=timer()
 gp_factory = emu.GP_factory.make(load_dir)
 end=timer()
 print("load ok after: ",end-start, " sec.")
 
-
-
 cosmo_jax = jc.Planck15()
-
-
-
-gps_gf = gp_factory["gf"]
-
-
-@jit
-def f(cosmo):
-    theta_star = emu._builtTheta(cosmo)
-    pred_gf = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_gf[:200] ))
-    return pred_gf
-
-# %time tmp=f(cosmo_jax)
-
-# %time tmp=f(cosmo_jax)
-
-
-
 
 start = timer()
 Nk=10*st.nk 
@@ -96,11 +84,12 @@ pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star)
 end = timer()
 print("end-start (sec)",end - start)
 
-# %timeit emu.linear_pk(cosmo_jax, k_star,z_star).block_until_ready()
+# %timeit pk_linear_interp=emu.linear_pk(cosmo_jax, k_star,z_star).block_until_ready()
 
-# %time  pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star).block_until_ready()  # measure JAX compilation time
+# %timeit  pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star).block_until_ready()  # measure JAX compilation time
 
-# %timeit emu.nonlinear_pk(cosmo_jax,k_star, z_star).block_until_ready() # measure JAX runtime
+# +
+# #%timeit emu.nonlinear_pk(cosmo_jax,k_star, z_star).block_until_ready() # measure JAX runtime
 
 # +
 # CCL & Jax-cosmo
@@ -190,12 +179,24 @@ axs[1].set_title(f"Pk NLin: Relative diff. wrt CLASS (z={z_ccl:.2f})");
 # # Jacobians & vectorization
 
 
+start = timer()
 jc_func_nl = lambda p: jc.power.nonlinear_matter_power(p,k_star, 
                                                1./(1+z_ccl))/p.h**3
 jac_jc_func_nl = jax.jacfwd(jc_func_nl)(cosmo_jax)
+end = timer()
+print("end-start (sec)",end - start)
 
+start = timer()
+func_nl = lambda p: emu.linear_pk(p,k_star, z_star=z_ccl)
+jac_nonlin_emu = jax.jacfwd(func_nl)(cosmo_jax)
+end = timer()
+print("end-start (sec)",end - start)
+
+start = timer()
 func_nl = lambda p: emu.nonlinear_pk(p,k_star, z_star=z_ccl)
 jac_nonlin_emu = jax.jacfwd(func_nl)(cosmo_jax)
+end = timer()
+print("end-start (sec)",end - start)
 
 # ### Notice that the emulator has a fixed (Omega_k, w0, wa) values so the gradients are not relevant for these parameters 
 
@@ -210,7 +211,7 @@ for i,jaco in enumerate([jac_nonlin_emu, jac_jc_func_nl]):
     plt.plot(k_star,jaco.Omega_c,label="Omega_c",c=colors[i],ls=lines[i])
     plt.plot(k_star,jaco.n_s,label="n_s",c=colors[i],ls=lines[i])
     if i == 0:
-        ax.legend();
+        plt.legend();
 plt.xlabel(r"$k\ [h\ Mpc^{-1}]$")
 plt.xscale("log")
 plt.title(titles)
@@ -221,6 +222,7 @@ Omega_c_arr = jnp.linspace(cosmo_jax.Omega_c*0.5,cosmo_jax.Omega_c*1.5,10)
 axes = jc.Cosmology(Omega_c=0,
                     Omega_b=None,h=None,n_s=None,sigma8=None,Omega_k=None,w0=None,wa=None,gamma=None)
 
+start = timer()
 pk_nonlin_Omegac_emu = jax.vmap(func_nl, in_axes=(axes,))(
     jc.Cosmology(
         Omega_c=Omega_c_arr,
@@ -232,7 +234,10 @@ pk_nonlin_Omegac_emu = jax.vmap(func_nl, in_axes=(axes,))(
         w0=cosmo_jax.w0,
         wa=cosmo_jax.wa,
         gamma=cosmo_jax.gamma))
+end = timer()
+print("end-start (sec)",end - start)
 
+start = timer()
 pk_nonlin_Omegac_jc = jax.vmap(jc_func_nl, in_axes=(axes,))(
     jc.Cosmology(
         Omega_c=Omega_c_arr,
@@ -244,6 +249,8 @@ pk_nonlin_Omegac_jc = jax.vmap(jc_func_nl, in_axes=(axes,))(
         w0=cosmo_jax.w0,
         wa=cosmo_jax.wa,
         gamma=cosmo_jax.gamma))
+end = timer()
+print("end-start (sec)",end - start)
 
 titles=f"Pk NonLin (color: emu, dashed: jax_cosmo)  (z={z_ccl:.2f})"
 fig = plt.figure(figsize=(8,8))

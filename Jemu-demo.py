@@ -16,7 +16,7 @@
 # +
 import os
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE']='false'
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.50'
+#os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.90'
 
 
 import numpy as np

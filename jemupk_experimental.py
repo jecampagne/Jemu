@@ -5,9 +5,13 @@ import util as ut              # utility function
 from gaussproc_emu_experimental import *
 #from gaussproc_emu import *
 
+import jax
+jax.config.update("jax_enable_x64", True)
 from jax import jit, vmap
 import jax.numpy as jnp
 from functools import partial
+from jax.tree_util import Partial       ##### New approach: Custom PyTree
+
 
 from jax_cosmo.core import Cosmology as jc_cosmo
 
@@ -71,14 +75,42 @@ class GP_factory():
             n_gf = jemu_st.nk * jemu_st.nz
 
             def load_one_gf(i):
-                folder_gf = directory + '/gf_kscale'
-                fname_gf  = 'gp_' + str(i)
-                gf_model = GPEmu(kernel=jemu_st.kernel_gf,
-                             order=jemu_st.order,
-                             x_trans=jemu_st.x_trans,
-                             y_trans=jemu_st.gf_y_trans,
-                             use_mean=jemu_st.use_mean)
-                gf_model.load_info(folder_gf, fname_gf)
+                folder_name = directory + '/gf_kscale'
+                file_name  = 'gp_' + str(i)
+                fname = folder_name + '/' + file_name + '.npz'  
+                data = np.load(fname, allow_pickle=True)   ##  JEC 1/7/22 load here to instantiate GPEmu
+                kernel = Partial(jemu_st.kernel_gf,
+                                 params=data["kernel_hat"].item(),
+                                 noise=0.0, jitter=0.0)
+                gf_model = GPEmu(order=jemu_st.order,
+                                 kernel=kernel,
+                                 x_train=data["x_train"],
+                                 mean_theta=data['mean_theta'],
+                                 beta_hat=data["beta_hat"],
+                                 kinv_XX_res=data["kinv_XX_res"],
+                                 mean_function=data["mean_function"],
+                                 mu_matrix=data['mu_matrix'],
+                                 y_min=data['y_min'][0]
+                                 )
+##                 gf_model = GPEmu(kernel=jemu_st.kernel_gf,
+##                                  order=jemu_st.order,
+##                                  x_train=data["x_train"],
+##                                  mean_theta=data['mean_theta'],
+##                                  kernel_hat=data["kernel_hat"].item(),
+##                                  beta_hat=data["beta_hat"],
+##                                  kinv_XX_res=data["kinv_XX_res"],
+##                                  mean_function=data["mean_function"],
+##                                  mu_matrix=data['mu_matrix'],
+##                                  y_min=data['y_min'][0]
+##                                  )
+## JEC 1/7/22 
+##                 gf_model = GPEmu(kernel=jemu_st.kernel_gf,
+##                              order=jemu_st.order,
+##                              x_trans=jemu_st.x_trans,
+##                              y_trans=jemu_st.gf_y_trans,
+##                              use_mean=jemu_st.use_mean)
+##                 gf_model.load_info(folder_gf, fname_gf)
+                
                 return gf_model
 
 
@@ -88,14 +120,41 @@ class GP_factory():
             # Linear Pk at z=0
             n_pl = jemu_st.nk
             def load_one_pl(i):
-                folder_pl = directory + '/pl'
-                fname_gf  = 'gp_' + str(i)
-                pl_model = GPEmu(kernel=jemu_st.kernel_pklin,
-                             order=jemu_st.order,
-                             x_trans=jemu_st.x_trans,
-                             y_trans=jemu_st.pl_y_trans,
-                             use_mean=jemu_st.use_mean)
-                pl_model.load_info(folder_pl, fname_gf)
+                folder_name = directory + '/pl'
+                file_name  = 'gp_' + str(i)
+                fname = folder_name + '/' + file_name + '.npz'  
+                data = np.load(fname, allow_pickle=True)   ##  JEC 1/7/22 load here to instantiate GPEmu
+                kernel = Partial(jemu_st.kernel_pklin,
+                                 params=data["kernel_hat"].item(),
+                                 noise=0.0, jitter=0.0)
+                pl_model = GPEmu(order=jemu_st.order,
+                                 kernel=kernel,   ###
+                                 x_train=data["x_train"],
+                                 mean_theta=data['mean_theta'],
+                                 beta_hat=data["beta_hat"],
+                                 kinv_XX_res=data["kinv_XX_res"],
+                                 mean_function=data["mean_function"],
+                                 mu_matrix=data['mu_matrix'],
+                                 y_min=data['y_min'][0]
+                                 )
+##                 pl_model = GPEmu(kernel=jemu_st.kernel_pklin,   ###
+##                                  order=jemu_st.order,
+##                                  x_train=data["x_train"],
+##                                  mean_theta=data['mean_theta'],
+##                                  kernel_hat=data["kernel_hat"].item(),
+##                                  beta_hat=data["beta_hat"],
+##                                  kinv_XX_res=data["kinv_XX_res"],
+##                                  mean_function=data["mean_function"],
+##                                  mu_matrix=data['mu_matrix'],
+##                                  y_min=data['y_min'][0]
+##                                  )
+                                
+##                 pl_model = GPEmu(kernel=jemu_st.kernel_pklin,
+##                              order=jemu_st.order,
+##                              x_trans=jemu_st.x_trans,
+##                              y_trans=jemu_st.pl_y_trans,
+##                              use_mean=jemu_st.use_mean)
+##                 pl_model.load_info(folder_pl, fname_gf)
                 return pl_model
             
             gps_pl = load_parallel_gp(load_one_pl, n_pl)
@@ -104,14 +163,43 @@ class GP_factory():
             # Non Linear Pk at z=0
             n_pnl = jemu_st.nk
             def load_one_pnl(i):
-                folder_pnl = directory + '/pnl'
-                fname_gf  = 'gp_' + str(i)
-                pnl_model = GPEmu(kernel=jemu_st.kernel_pknl,
-                             order=jemu_st.order,
-                             x_trans=jemu_st.x_trans,
-                             y_trans=jemu_st.pnl_y_trans,
-                             use_mean=jemu_st.use_mean)
-                pnl_model.load_info(folder_pnl, fname_gf)
+                folder_name = directory + '/pnl'
+                file_name  = 'gp_' + str(i)
+                fname = folder_name + '/' + file_name + '.npz'  
+                data = np.load(fname, allow_pickle=True)   ##  JEC 1/7/22 load here to instantiate GPEmu
+                kernel = Partial(jemu_st.kernel_pknl,
+                                 params=data["kernel_hat"].item(),
+                                 noise=0.0, jitter=0.0)
+
+                pnl_model = GPEmu(order=jemu_st.order,
+                                  kernel=kernel, ####
+                                  x_train=data["x_train"],
+                                  mean_theta=data['mean_theta'],
+                                  beta_hat=data["beta_hat"],
+                                  kinv_XX_res=data["kinv_XX_res"],
+                                  mean_function=data["mean_function"],
+                                  mu_matrix=data['mu_matrix'],
+                                  y_min=data['y_min'][0]
+                                  )
+##                 pnl_model = GPEmu(kernel=jemu_st.kernel_pknl, ####
+##                                  order=jemu_st.order,
+##                                  x_train=data["x_train"],
+##                                  mean_theta=data['mean_theta'],
+##                                  kernel_hat=data["kernel_hat"].item(),
+##                                  beta_hat=data["beta_hat"],
+##                                  kinv_XX_res=data["kinv_XX_res"],
+##                                  mean_function=data["mean_function"],
+##                                  mu_matrix=data['mu_matrix'],
+##                                  y_min=data['y_min'][0]
+##                                  )
+
+##                 pnl_model = GPEmu(kernel=jemu_st.kernel_pknl,
+##                              order=jemu_st.order,
+##                              x_trans=jemu_st.x_trans,
+##                              y_trans=jemu_st.pnl_y_trans,
+##                              use_mean=jemu_st.use_mean)
+##                 pnl_model.load_info(folder_pnl, fname_gf)
+
                 return pnl_model
 
             gps_pnl = load_parallel_gp(load_one_pnl, n_pnl)
@@ -120,14 +208,46 @@ class GP_factory():
             #Q-func bis = Pk_NL(k,z)/Pk_NL(k,z=0)
             n_qf = jemu_st.nz * jemu_st.nk
             def load_one_qf(i):
-                folder_qf = directory + '/qf_bis'
-                fname_gf  = 'gp_' + str(i)
-                qf_model = GPEmu(kernel=jemu_st.kernel_qfunc,
-                             order=jemu_st.order,
-                             x_trans=jemu_st.x_trans,
-                             y_trans=jemu_st.qf_y_trans,          ######
-                             use_mean=jemu_st.use_mean)
-                qf_model.load_info(folder_qf, fname_gf)
+                folder_name = directory + '/qf_bis'
+                file_name  = 'gp_' + str(i)
+                fname = folder_name + '/' + file_name + '.npz'  
+                data = np.load(fname, allow_pickle=True)   ##  JEC 1/7/22 load here to instantiate GPEmu
+
+                kernel = Partial(jemu_st.kernel_qfunc,
+                                 params=data["kernel_hat"].item(),
+                                 noise=0.0, jitter=0.0)
+
+
+                qf_model = GPEmu(order=jemu_st.order,
+                                 kernel=kernel,
+                                 x_train=data["x_train"],
+                                 mean_theta=data['mean_theta'],
+                                 beta_hat=data["beta_hat"],
+                                 kinv_XX_res=data["kinv_XX_res"],
+                                 mean_function=data["mean_function"],
+                                 mu_matrix=data['mu_matrix'],
+                                 y_min=data['y_min'][0]
+                                 )
+
+##                 qf_model = GPEmu(kernel=jemu_st.kernel_qfunc, ###
+##                                  order=jemu_st.order,
+##                                  x_train=data["x_train"],
+##                                  mean_theta=data['mean_theta'],
+##                                  kernel_hat=data["kernel_hat"].item(),
+##                                  beta_hat=data["beta_hat"],
+##                                  kinv_XX_res=data["kinv_XX_res"],
+##                                  mean_function=data["mean_function"],
+##                                  mu_matrix=data['mu_matrix'],
+##                                  y_min=data['y_min'][0]
+##                                  )
+
+                
+##                 qf_model = GPEmu(kernel=jemu_st.kernel_qfunc,
+##                              order=jemu_st.order,
+##                              x_trans=jemu_st.x_trans,
+##                              y_trans=jemu_st.qf_y_trans,          ######
+##                              use_mean=jemu_st.use_mean)
+##                 qf_model.load_info(folder_qf, fname_gf)
                 return qf_model
 
             gps_qf = load_parallel_gp(load_one_qf, n_qf)
@@ -142,7 +262,7 @@ class GP_factory():
 
 
 
-#@jit
+#@jit JEC 4/7/22 jit this function leads to very long compilation time
 def _gp_kzgrid_pred_linear(theta_star):
     """
         Predict GPs at the (k_i,z_j) 'i,j' in nk x nz grid
@@ -160,11 +280,13 @@ def _gp_kzgrid_pred_linear(theta_star):
     gps_pl = gps["pl"]
 
     # Growth @ k_i, z_j
-    pred_gf = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_gf ))
+    ##pred_gf = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_gf ))
+    pred_gf = jnp.array([gp.predict(theta_star) for gp in  gps_gf])
     pred_gf = pred_gf.reshape(jemu_st.nk,jemu_st.nz)
 
     # Linear Pk @ k_i, z=0
-    pred_pl_z0 = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_pl))
+    ##pred_pl_z0 = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_pl))
+    pred_pl_z0 = jnp.array([gp.predict(theta_star) for gp in  gps_pl])
 
     # Linear Pk @ k_i, z_j
 
@@ -173,7 +295,7 @@ def _gp_kzgrid_pred_linear(theta_star):
     return pred_pl
 
 
-#@jit
+#@jit JEC 4/7/22 jit this function leads to very long compilation time
 def _gp_kzgrid_pred_nlinear(theta_star):
     """
         Predict GPs at the (k_i,z_j) 'i,j' in nk x nz grid
@@ -192,13 +314,13 @@ def _gp_kzgrid_pred_nlinear(theta_star):
 
 
     # Non Linear Pk @ k_i, z=0
-    #pred_pnl_z0 = jnp.stack([pnl_model.predict(theta_star) for pnl_model in gps_pnl])
-    pred_pnl_z0 = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_pnl ))
-
+    ##pred_pnl_z0 = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_pnl ))
+    pred_pnl_z0 = jnp.array([gp.predict(theta_star) for gp in gps_pnl])
 
     # Qfunc bis & k_i, z_j
-    #pred_qf = jnp.stack([qf_model.predict(theta_star) for qf_model in gps_qf])
-    pred_qf =  jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star),gps_qf))
+    ## pred_qf =  jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star),gps_qf))
+    pred_qf = jnp.array([gp.predict(theta_star) for gp in gps_qf])
+
     pred_qf = pred_qf.reshape(jemu_st.nk,jemu_st.nz)
 
     # Non Linear Pk @ k_i, z_j
