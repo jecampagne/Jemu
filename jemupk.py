@@ -15,7 +15,7 @@ from jax.tree_util import Partial       ##### New approach: Custom PyTree
 from jax_cosmo.core import Cosmology as jc_cosmo
 
 #########
-# JEC version > 25 June 2022 
+# JEC version > 3 July 2022 
 #
 # Code for Pk Linear  [ Pk Non Linear ] (Cosmo, k, z)
 # using:
@@ -91,24 +91,6 @@ class GP_factory():
                                  mu_matrix=data['mu_matrix'],
                                  y_min=data['y_min'][0]
                                  )
-##                 gf_model = GPEmu(kernel=jemu_st.kernel_gf,
-##                                  order=jemu_st.order,
-##                                  x_train=data["x_train"],
-##                                  mean_theta=data['mean_theta'],
-##                                  kernel_hat=data["kernel_hat"].item(),
-##                                  beta_hat=data["beta_hat"],
-##                                  kinv_XX_res=data["kinv_XX_res"],
-##                                  mean_function=data["mean_function"],
-##                                  mu_matrix=data['mu_matrix'],
-##                                  y_min=data['y_min'][0]
-##                                  )
-## JEC 1/7/22 
-##                 gf_model = GPEmu(kernel=jemu_st.kernel_gf,
-##                              order=jemu_st.order,
-##                              x_trans=jemu_st.x_trans,
-##                              y_trans=jemu_st.gf_y_trans,
-##                              use_mean=jemu_st.use_mean)
-##                 gf_model.load_info(folder_gf, fname_gf)
                 
                 return gf_model
 
@@ -136,24 +118,6 @@ class GP_factory():
                                  mu_matrix=data['mu_matrix'],
                                  y_min=data['y_min'][0]
                                  )
-##                 pl_model = GPEmu(kernel=jemu_st.kernel_pklin,   ###
-##                                  order=jemu_st.order,
-##                                  x_train=data["x_train"],
-##                                  mean_theta=data['mean_theta'],
-##                                  kernel_hat=data["kernel_hat"].item(),
-##                                  beta_hat=data["beta_hat"],
-##                                  kinv_XX_res=data["kinv_XX_res"],
-##                                  mean_function=data["mean_function"],
-##                                  mu_matrix=data['mu_matrix'],
-##                                  y_min=data['y_min'][0]
-##                                  )
-                                
-##                 pl_model = GPEmu(kernel=jemu_st.kernel_pklin,
-##                              order=jemu_st.order,
-##                              x_trans=jemu_st.x_trans,
-##                              y_trans=jemu_st.pl_y_trans,
-##                              use_mean=jemu_st.use_mean)
-##                 pl_model.load_info(folder_pl, fname_gf)
                 return pl_model
             
             gps_pl = load_parallel_gp(load_one_pl, n_pl)
@@ -180,24 +144,6 @@ class GP_factory():
                                   mu_matrix=data['mu_matrix'],
                                   y_min=data['y_min'][0]
                                   )
-##                 pnl_model = GPEmu(kernel=jemu_st.kernel_pknl, ####
-##                                  order=jemu_st.order,
-##                                  x_train=data["x_train"],
-##                                  mean_theta=data['mean_theta'],
-##                                  kernel_hat=data["kernel_hat"].item(),
-##                                  beta_hat=data["beta_hat"],
-##                                  kinv_XX_res=data["kinv_XX_res"],
-##                                  mean_function=data["mean_function"],
-##                                  mu_matrix=data['mu_matrix'],
-##                                  y_min=data['y_min'][0]
-##                                  )
-
-##                 pnl_model = GPEmu(kernel=jemu_st.kernel_pknl,
-##                              order=jemu_st.order,
-##                              x_trans=jemu_st.x_trans,
-##                              y_trans=jemu_st.pnl_y_trans,
-##                              use_mean=jemu_st.use_mean)
-##                 pnl_model.load_info(folder_pnl, fname_gf)
 
                 return pnl_model
 
@@ -228,25 +174,6 @@ class GP_factory():
                                  y_min=data['y_min'][0]
                                  )
 
-##                 qf_model = GPEmu(kernel=jemu_st.kernel_qfunc, ###
-##                                  order=jemu_st.order,
-##                                  x_train=data["x_train"],
-##                                  mean_theta=data['mean_theta'],
-##                                  kernel_hat=data["kernel_hat"].item(),
-##                                  beta_hat=data["beta_hat"],
-##                                  kinv_XX_res=data["kinv_XX_res"],
-##                                  mean_function=data["mean_function"],
-##                                  mu_matrix=data['mu_matrix'],
-##                                  y_min=data['y_min'][0]
-##                                  )
-
-                
-##                 qf_model = GPEmu(kernel=jemu_st.kernel_qfunc,
-##                              order=jemu_st.order,
-##                              x_trans=jemu_st.x_trans,
-##                              y_trans=jemu_st.qf_y_trans,          ######
-##                              use_mean=jemu_st.use_mean)
-##                 qf_model.load_info(folder_qf, fname_gf)
                 return qf_model
 
             gps_qf = load_parallel_gp(load_one_qf, n_qf)
@@ -328,7 +255,7 @@ def _gp_kzgrid_pred_nlinear(theta_star):
     return pred_pnl
 
 
-#@jit
+
 def _builtTheta(cosmo):
     """ 
         From jax-cosmo.core.Cosmology to emulator parameters
@@ -339,7 +266,7 @@ def _builtTheta(cosmo):
                               cosmo.n_s,
                               cosmo.h])
 
-#@jit
+
 def linear_pk(cosmo, k_star, z_star):
     """
     cosmo: jax-cosmo.core.Cosmology
@@ -365,7 +292,7 @@ def linear_pk(cosmo, k_star, z_star):
 
 
 
-#@jit
+
 def nonlinear_pk(cosmo, k_star, z_star):
 
 

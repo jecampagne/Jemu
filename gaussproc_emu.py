@@ -198,22 +198,18 @@ class GPEmu:
         children = (self.kernel,
             self.x_train,       # ndarray
                     self.mean_theta,    # ndarray
-####                    self.kernel_hat,    # dict
                     self.beta_hat,      # ndarray
                     self.kinv_XX_res,   # ndarray
                     self.mean_function, # ndarray
                     self.mu_matrix,     # ndarray
                     self.y_min          # float
                     )
-###        aux_data = {'kernel':self.kernel, 'order': self.order}
         aux_data = {'order': self.order}
         return (children, aux_data)
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-###        kernel = aux_data['kernel']
         order = aux_data['order']
-###        return cls(kernel,order, *children)
         return cls(order, *children)
 
     
