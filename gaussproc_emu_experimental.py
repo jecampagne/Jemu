@@ -101,6 +101,7 @@ def kernel_Matern12(X: jnp.ndarray,
 # ########## Helpers ##########
 
 
+
 @jit
 def _pred_original_function(gp, theta_star):
     '''
@@ -113,6 +114,8 @@ def _pred_original_function(gp, theta_star):
     mu = _simple_predict(gp,theta_star)
     y_original = jnp.power(10, mu) + 2.0 * gp.y_min
     return y_original
+
+predict = _pred_original_function
 
 
 @jit
@@ -192,7 +195,7 @@ class GPEmu:
     ###########
     ## NEW ####
     ###########
-    predict =  _pred_original_function
+##    predict =  _pred_original_function
 
     def tree_flatten(self):
         children = (self.kernel,

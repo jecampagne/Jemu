@@ -16,7 +16,7 @@
 # +
 import os
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE']='false'
-#os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.90'
+
 
 
 import numpy as np
@@ -81,9 +81,13 @@ Nk=10*st.nk
 k_star = jnp.geomspace(st.k_min_h_by_Mpc, st.k_max_h_by_Mpc, Nk, endpoint=True) #h/Mpc
 z_star = jnp.array([0.,1., 2., 3.])
 
-pk_linear_interp = emu.linear_pk(cosmo_jax, k_star,z_star)
+# %time pk_linear_interp = emu.linear_pk(cosmo_jax, k_star,z_star)
 
-pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star) 
+# %time pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star) 
+
+# %timeit pk_linear_interp = emu.linear_pk(cosmo_jax, k_star,z_star)
+
+# %timeit pk_nonlin_interp = emu.nonlinear_pk(cosmo_jax,k_star, z_star) 
 
 pk_linear_interp.shape, pk_nonlin_interp.shape
 
@@ -227,7 +231,7 @@ axs[1].set_title(f"Pk NLin: Relative diff. wrt CLASS (z={z_ccl:.2f})");
 jc_func_nl = lambda p: jc.power.nonlinear_matter_power(p,k_star, 1./(1+z_ccl))/p.h**3
 jac_jc_func_nl = jax.jacfwd(jc_func_nl)(cosmo_jax)
 
-func_nl = lambda p: emu.nonlinear_pk(p,k_star, z_star=jnp.array([z_ccl]))
+func_nl = lambda p: emu.nonlinear_pk(p,k_star, z_star=z_ccl)
 jac_nonlin_emu = jax.jacfwd(func_nl)(cosmo_jax)
 
 # ### Notice that the emulator has a fixed (Omega_k, w0, wa) values so the gradients are not relevant for these parameters 
@@ -254,7 +258,7 @@ Omega_c_arr = jnp.linspace(cosmo_jax.Omega_c*0.5,cosmo_jax.Omega_c*1.5,10)
 axes = jc.Cosmology(Omega_c=0,
                     Omega_b=None,h=None,n_s=None,sigma8=None,Omega_k=None,w0=None,wa=None,gamma=None)
 
-pk_nonlin_Omegac_emu = jax.vmap(func_nl, in_axes=(axes,))(
+pk_nonlin_Omegac_jc = jax.vmap(jc_func_nl, in_axes=(axes,))(
     jc.Cosmology(
         Omega_c=Omega_c_arr,
         Omega_b=cosmo_jax.Omega_b,
@@ -266,7 +270,7 @@ pk_nonlin_Omegac_emu = jax.vmap(func_nl, in_axes=(axes,))(
         wa=cosmo_jax.wa,
         gamma=cosmo_jax.gamma))
 
-pk_nonlin_Omegac_jc = jax.vmap(jc_func_nl, in_axes=(axes,))(
+pk_nonlin_Omegac_emu = jax.vmap(func_nl, in_axes=(axes,))(
     jc.Cosmology(
         Omega_c=Omega_c_arr,
         Omega_b=cosmo_jax.Omega_b,

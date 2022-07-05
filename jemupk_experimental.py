@@ -34,6 +34,10 @@ import settings_gfpkq_120x20  as st         # configuration file (update 2/June/
 
 import concurrent.futures  # JEC 27/6/22
 
+
+
+
+
 class JemuSettings(NamedTuple):
     kernel_pklin : Any = kernel_RBF
     kernel_pknl : Any = kernel_RBF
@@ -261,8 +265,18 @@ class GP_factory():
 
 
 
+#JEC 5/7/22
+def pytrees_stack(pytrees, axis=0):
+    results = jax.tree_util.tree_map(
+        lambda *values: jnp.stack(values, axis=axis), *pytrees)
+    return results
 
-#@jit JEC 4/7/22 jit this function leads to very long compilation time
+
+
+
+
+#####@jit JEC 4/7/22 jit this function leads to very long compilation time
+@jit  
 def _gp_kzgrid_pred_linear(theta_star):
     """
         Predict GPs at the (k_i,z_j) 'i,j' in nk x nz grid
@@ -279,14 +293,18 @@ def _gp_kzgrid_pred_linear(theta_star):
     gps_gf = gps["gf"]
     gps_pl = gps["pl"]
 
+    func = lambda x : predict(x,theta_star)
+    
+
     # Growth @ k_i, z_j
-    ##pred_gf = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_gf ))
-    pred_gf = jnp.array([gp.predict(theta_star) for gp in  gps_gf])
+    ##pred_gf = jnp.array([gp.predict(theta_star) for gp in  gps_gf])
+    pred_gf = jax.vmap(func)(pytrees_stack(gps_gf))
     pred_gf = pred_gf.reshape(jemu_st.nk,jemu_st.nz)
 
     # Linear Pk @ k_i, z=0
     ##pred_pl_z0 = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_pl))
-    pred_pl_z0 = jnp.array([gp.predict(theta_star) for gp in  gps_pl])
+    ## pred_pl_z0 = jnp.array([gp.predict(theta_star) for gp in  gps_pl])
+    pred_pl_z0 = jax.vmap(func)(pytrees_stack(gps_pl))
 
     # Linear Pk @ k_i, z_j
 
@@ -296,6 +314,7 @@ def _gp_kzgrid_pred_linear(theta_star):
 
 
 #@jit JEC 4/7/22 jit this function leads to very long compilation time
+@jit
 def _gp_kzgrid_pred_nlinear(theta_star):
     """
         Predict GPs at the (k_i,z_j) 'i,j' in nk x nz grid
@@ -313,13 +332,20 @@ def _gp_kzgrid_pred_nlinear(theta_star):
     gps_pnl = gps["pnl"]
 
 
+    func = lambda x : predict(x,theta_star)
+
+
     # Non Linear Pk @ k_i, z=0
     ##pred_pnl_z0 = jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star), gps_pnl ))
-    pred_pnl_z0 = jnp.array([gp.predict(theta_star) for gp in gps_pnl])
+    ##    pred_pnl_z0 = jnp.array([gp.predict(theta_star) for gp in gps_pnl])
+    pred_pnl_z0= jax.vmap(func)(pytrees_stack(gps_pnl))
+
 
     # Qfunc bis & k_i, z_j
     ## pred_qf =  jnp.array(jax.tree_map(lambda gp: gp.predict(theta_star),gps_qf))
-    pred_qf = jnp.array([gp.predict(theta_star) for gp in gps_qf])
+    ##pred_qf = jnp.array([gp.predict(theta_star) for gp in gps_qf])
+    pred_qf = jax.vmap(func)(pytrees_stack(gps_qf))
+
 
     pred_qf = pred_qf.reshape(jemu_st.nk,jemu_st.nz)
 

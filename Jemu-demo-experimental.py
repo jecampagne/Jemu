@@ -16,7 +16,7 @@
 # +
 import os
 os.environ['XLA_PYTHON_CLIENT_PREALLOCATE']='false'
-os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.90'
+#os.environ['XLA_PYTHON_CLIENT_MEM_FRACTION']='.90'
 #os.environ['XLA_FLAGS']='--xla_gpu_autotune_level=2'
 
 from timeit import default_timer as timer
@@ -186,11 +186,7 @@ jac_jc_func_nl = jax.jacfwd(jc_func_nl)(cosmo_jax)
 end = timer()
 print("end-start (sec)",end - start)
 
-start = timer()
-func_nl = lambda p: emu.linear_pk(p,k_star, z_star=z_ccl)
-jac_nonlin_emu = jax.jacfwd(func_nl)(cosmo_jax)
-end = timer()
-print("end-start (sec)",end - start)
+emu.nonlinear_pk(cosmo_jax,k_star, z_star=z_ccl)
 
 start = timer()
 func_nl = lambda p: emu.nonlinear_pk(p,k_star, z_star=z_ccl)
