@@ -1,13 +1,45 @@
 import sys
+import shutil
+import argparse
 
 from timeit import default_timer as timer
 
 import numpy as np
 from classy import Class
-from classy import CosmoComputationError    ########## 
+from classy import CosmoComputationError
 
 import helper as hp      # load/save 
-import settings_gfpkq_120x20 as st
+
+
+###
+#   CLASS RUN with the cosmological parameter set
+#   as it can fail with try up to 3 times to generate cosmo set that differ from original
+#   by a little shift.
+#   In case the failure persist then with exit
+#   If the new cosmo is ok, then we register it in the cosmo_validated array
+###
+#
+# The CLASS run can take very long time, so we store the correspondant files at each validation
+#    of a new cosmology set
+#
+# version >19thJune22
+# Use case [Omega_cdm, Omega_b, sigma8, ns, h] cosmmo. No more "As" parameter 
+# Run CLASS with minimal neutrino settings.
+
+
+#######
+import settings_default as st     #### USER SETTINGS
+#######
+
+
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('--dir', default='./', type=str, help='root directory (location of cosmo parameter set and outputs)')
+parser.add_argument('--cosmo', type=str, help='cosmology dataset in [dir]/trainingset', required=True)
+parser.add_argument('--dump', action='store_true', help='dump first cosmo param. run and do not save')
+parser.add_argument('--dirOut',default="components_new_", help='final directory under [dir]/trainingset containg the CLASS results. We add the (k,z) grid size info')
+parser.add_argument('--idrange', type=int, nargs=2, default=[0,1000], help='cosmo parameter index in the dataset [first, last)')
+
+
 
 ##########################
 # Generate training set for GaussProc optim.
@@ -17,7 +49,6 @@ def make_class_dict(cosmo, sigma8=True):
     """
     CLASS parameters dictionnary
     """
-    # JEC >19thJune22 use Omega instead of omega=Omega * h^2
     Omega_c_emu = cosmo[0]    
     Omega_b_emu = cosmo[1]
     n_s_emu = cosmo[3]
@@ -27,8 +58,8 @@ def make_class_dict(cosmo, sigma8=True):
         'output': 'mPk',
         'n_s': n_s_emu, 
         'h': h_emu,
-        'Omega_b': Omega_b_emu,          #####
-        'Omega_cdm':Omega_c_emu,         #####
+        'Omega_b': Omega_b_emu,
+        'Omega_cdm':Omega_c_emu,
         'N_ncdm': 1.0, 
         'deg_ncdm': 3.0, 
         'T_ncdm': 0.71611, 
@@ -51,9 +82,6 @@ def make_class_dict(cosmo, sigma8=True):
     #Neutrino default
     class_dict_def['m_ncdm'] = st.fixed_nm['M_tot']/class_dict_def['deg_ncdm']
 
-
-#    class_dict_lin = class_dict_def.copy()
-#    class_dict_lin['non_linear'] = 'none'
     class_dict_nl = class_dict_def.copy()
     class_dict_nl['non_linear'] = 'halofit'
     
@@ -62,25 +90,22 @@ def make_class_dict(cosmo, sigma8=True):
 ################################
 if __name__ == "__main__":
 
+    args = parser.parse_args()
+
+
     #############
-    
+    root_dir =  args.dir
 
-    root_dir = "./"
-
-    dump = False  ### debug ####
+    dump = args.dump
     if dump:
         print("################")
         print("################")
-        print("##### DUMP #####")
+        print("## DUMP MODE  ##")
         print("################")
         print("################")
 
 
     if st.sigma8:
-        #############
-        # Load cosmological parameter sets
-        # Omega_cdm, Omega_b, sigma8, ns, h  (version >19thJune22)
-        ###########
         cosmologies = hp.load_arrays(root_dir + 'trainingset','cosmologies_Omega_sig8')
         tag="sigma8"
 
@@ -90,21 +115,14 @@ if __name__ == "__main__":
         raise NotImplementedError("As cosmo: No more in use")
 
     print(f"Cosmo[{tag}]: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
-        
-    if len(sys.argv) >= 2:
-        ifirst_cosmo = int(sys.argv[1])
-    else:
-        ifirst_cosmo = 0
 
-    if len(sys.argv) >= 3:
-        ilast_cosmo = int(sys.argv[2])
-    else:
-        ilast_cosmo = cosmologies.shape[0]
 
+    ifirst_cosmo = args.idrange[0]
+    ilast_cosmo  = args.idrange[1]
+    assert ilast_cosmo <= cosmologies.shape[0], f"idrange max value ={ilast_cosmo} > nber of cosmo param.[{cosmologies.shape[0]}] "
 
     if dump:
         print(f"cosmo index:[{ifirst_cosmo}, {ilast_cosmo}]")
-
 
     all_pklin0  = []
     all_pknl0         = []
@@ -126,9 +144,9 @@ if __name__ == "__main__":
 
         cosmo = cosmologies[ic]
         
-        if dump:
-            assert ic==ifirst_cosmo, "End of dump"
-
+        if dump and ic>1:
+            break
+            
         tries = 3
         for it in range(tries):
             try: 
@@ -136,11 +154,6 @@ if __name__ == "__main__":
                 start_cur = timer()
 
                 params_nl = make_class_dict(cosmo)
-
-#                #Prepare CLASS for Linear Pk
-#                class_module_lin = Class()
-#                class_module_lin.set(params_lin)
-#                class_module_lin.compute()
 
                 #Prepare CLASS for Non Linear Pk
                 class_module_nl = Class()
@@ -155,11 +168,11 @@ if __name__ == "__main__":
                 else:
                     raise
             break
-    
+
+        
         cosmo_validated.append(cosmo)
 
         # Compute Pk linear at zref Plin(k,zref) and compute the Growth D(z) = P(kref,z)/P(kref,zref) , zref=0
-        #pklin0 = np.array([class_module_lin.pk_lin(k_g[k] * params_lin['h'], zref) for k in range(st.nk)])
         pklin0 = np.array([class_module_nl.pk_lin(k_g[k] * params_nl['h'], zref) for k in range(st.nk)])
 
         # Define D(k,z) =  P(k,z)/P(k,zref)      new 8/6/22 
@@ -188,7 +201,7 @@ if __name__ == "__main__":
             print("3)",pknl.shape, pknl0.shape)
 
 
-        #Qfunc_bis(k,z) =  Pk_nl(k,z) /  Pk_nl(k,z=0) - 1    new 8/6/22
+        #Qfunc_bis(k,z) =  Pk_nl(k,z) /  Pk_nl(k,z=0) - 1
         q_func_bis = pknl / pknl0.reshape(st.nk,1) - 1
 
         if dump:
@@ -197,13 +210,17 @@ if __name__ == "__main__":
         
         #store
         all_pklin0.append(pklin0.flatten())
-        all_growth_kscale.append(growth_kscale.flatten())  # new 8/6/22
-        all_pknl0.append(pknl0.flatten())                  # new 8/6/22
-        all_qfunc_bis.append(q_func_bis.flatten())         # new 8/6/22
+        all_growth_kscale.append(growth_kscale.flatten())
+        all_pknl0.append(pknl0.flatten())
+        all_qfunc_bis.append(q_func_bis.flatten())
 
         
         #temporary storage
-        dirName =  root_dir + 'trainingset/components_tmp_' + str(ifirst_cosmo)+ "/" 
+
+        
+        dirName =  root_dir + 'trainingset/component_tmp'+ str(ifirst_cosmo)+ "_" + str(ic) + "/" 
+        if dump:
+            print("Dump: SAve temporary files in : ", dirName)
         fn_pklin = 'pk_linear'
         fn_pknl = 'pk_nl'
         fn_growth_kscale = 'growth_factor_kscale'
@@ -215,11 +232,14 @@ if __name__ == "__main__":
         hp.store_arrays(all_qfunc_bis, dirName, fn_q_func_bis)
         hp.store_arrays(cosmo_validated,dirName, 'cosmo_validated')
 
-
-
+        # remove previous intermediate storage
+        if ic>0:
+            old_ic = ic-1
+            old_dir = root_dir + 'trainingset/component_tmp'+ str(ifirst_cosmo)+ "_" + str(old_ic) + "/"
+            shutil.rmtree(old_dir, ignore_errors=True)
+        
+        
         # Clean CLASS memory
-#        class_module_lin.struct_cleanup()
-#        class_module_lin.empty()
         class_module_nl.struct_cleanup()
         class_module_nl.empty()
 
@@ -233,11 +253,12 @@ if __name__ == "__main__":
     ##########
     print("Save....")
 
-    if st.sigma8:
-        dirName =  root_dir + 'trainingset/components_Omega_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
-    else:
-        raise NotImplementedError("As cosmo: No more in use")
+    dirName =  root_dir + 'trainingset/' + args.dirOut + str(st.nk) + "x" + str(st.nz) +'_' + \
+              str(ifirst_cosmo)+ "_" + str(ic) + "/"
         
+    if dump:
+        print("Dump:  files in : ", dirName)
+
     fn_pklin = 'pk_linear'
     fn_pknl = 'pk_nl'
     fn_growth_kscale = 'growth_factor_kscale'
@@ -258,7 +279,8 @@ if __name__ == "__main__":
         hp.store_arrays(all_pknl0, dirName, fn_pknl)
         hp.store_arrays(all_qfunc_bis, dirName, fn_q_func_bis)
         hp.store_arrays(cosmo_validated,dirName, 'cosmo_validated')
-    
+    else:
+        print("END DUMP: please clean the directry: ",root_dir + 'trainingset')
     #
     end = timer()
     print(f"All done (sec): {end - start}")
