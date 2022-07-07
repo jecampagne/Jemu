@@ -6,6 +6,7 @@ CLASS Pk emulator in JAX. The schema of emulation is summarized in this slide
 
 ![image](https://user-images.githubusercontent.com/20539759/177787313-3dd12158-f021-4340-89d8-fe91a917fe99.png)
 
+The prediction at a new $(k^\ast, z^\ast, \theta^\ast)$ proceeds first to the GP predictions on the (k,z) grid for the new set of cosmological parameter set $(\theta^\ast)$ , and then to a 2D interpolation at the new $(k^\ast, z^\ast)$. 
 
 Jump to the [Jemu-demo.ipynb](https://github.com/jecampagne/Jemu/blob/main/Jemu-demo.ipynb) and play with it...
 In the current version running on GPU (type K80): 
