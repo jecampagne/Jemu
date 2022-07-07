@@ -1,105 +1,40 @@
-
 import numpy as np
 
 
 from timeit import default_timer as timer
 
 import os
-import logging
+import shutil
+import argparse
 
-import settings_gfpkq_120x20  as st         # configuration file (update 2/June/22)
-import helper as hp   
-# Simple Gaussian process class adapted for the emulator
-from gaussproc_emu_training import *
 
 #######
 # Training of Pk Linear (k,z=0) 
+# It uses
+# - the cosmological parameter dataset of make_new_cosmo.py
+# - the CLASS Pk file produced by make_trainingset_gfpkq.py
 #######
 
 
-def get_logger(name: str, log_name: str, folder_name: str = 'logs'):
-    '''
-    Create a log file for each Python scrip
-    :param: name (str) - name of the Python script
-    :param: log_name (str) - name of the output log file
-    '''
-    # create the folder if it does not exist
-    if not os.path.exists(folder_name+'/'+log_name):
-        os.makedirs(folder_name+'/'+log_name)
+
+#######
+import settings_default as st  #### USER SETTINGS should be the same as for make_trainingset_gfpkq.py
+#######
 
 
-    log_format = '%(asctime)s  %(name)8s  %(levelname)5s  %(message)s'
+import helper as hp    # I/O
 
+######
+# Simple Gaussian process class adapted for the emulator training
+from gaussproc_emu_training import *
+######
 
-    logging.basicConfig(level=logging.INFO,
-                        format=log_format,
-                        filename=folder_name + '/' + log_name + '.log',
-                        filemode='w')
-
-
-    console = logging.StreamHandler()
-    console.setLevel(logging.INFO)
-    console.setFormatter(logging.Formatter(log_format))
-    logging.getLogger(name).addHandler(console)
-
-
-    return logging.getLogger(name)
-
-logger = get_logger('training', 'script_training_DPlinOneQ', 'logs')
-
-
-# # Training of Pklin
-root_dir = "./"
-dump = True
-
-
-if st.sigma8:
-    #############
-    # Load cosmological parameter sets
-    # Omega_cdm, Omega_b, sigma8, ns, h
-    ###########
-    dircosmo = root_dir + 'trainingset'
-    cosmologies = hp.load_arrays(dircosmo,'cosmologies_Omega_sig8')
-
-    tag="sigma8"
-
-    if dump:
-        print("0)",cosmologies)
-else:
-    raise NotImplementedError("As cosmo: No more in use")
-    
-
-
-print(f"Cosmo[{tag}]: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
-
-print(f"Order of polynomial approx: {st.order}")
-print(f"Whitening of x_train: {st.x_trans}")
-print(f"Transformation of y_tain: {st.gf_args}")
-print(f"outputs are centred on zero: {st.use_mean}")
-print(f"noise covariance matrix: {st.var}")
-print(f"Matrix diag term for stability: { st.jitter}")
-print(f"z range [{st.zmin}, {st.zmax}]")
-print(f"k range [{st.k_max_h_by_Mpc}, {st.k_min_h_by_Mpc}]")
-
-#########
-if st.sigma8:
-    dirName = root_dir + 'trainingset/components_Omega_sig8_'+ str(st.nk) + "x" + str(st.nz) +'/'
-    pk_linear = hp.load_arrays(dirName, 'pk_linear')
-else:
-    raise NotImplementedError("As cosmo: No more in use")
-
-    
-print(f"Linear Pk: nber of training points {pk_linear.shape[0]} for {pk_linear.shape[1]} k (log)")
-n_pl = pk_linear.shape[1]
-assert n_pl == st.nk, "Hummm something strange..."
-print(f"The number of GPs to model Pklin={n_pl} (= nber of k_bins) ")
-
-if  st.sigma8:
-    folder_pl = root_dir + '/pknl_components' + st.d_one_plus +'_Omega_sig8_' + str(st.nk) + "x" + str(st.nz) +  '_RBF' + '/pl'
-else:
-    raise NotImplementedError("As cosmo: No more in use")
-    
-arg_pl = [[cosmologies, pk_linear[:, i], st.pl_args, folder_pl, 'gp_' + str(i)] for i in range(n_pl)]
+parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser.add_argument('--dir', default='./', type=str, help='root directory (aka [dir] below) (location of cosmo parameter set and outputs)')
+parser.add_argument('--cosmo', type=str, help='cosmology dataset in [dir]/trainingset', required=True)
+parser.add_argument('--dump', action='store_true', help='dump first cosmo param. run and do not save')
+parser.add_argument('--dirIn', help='directory under [dir]/trainingset containg the CLASS results', required=True)
+parser.add_argument('--tagOut', help='tag for directory output: [dir]/pknl_components_<tag>/pl containing the training results', required=True)
 
 
 
@@ -110,6 +45,8 @@ def Job(theta: np.ndarray,
         n_restart: int = 5,
         print_dump: bool = False):
               
+        if(print_dump):
+            print("Init...")
         gp_model.Init()
         gp_model.mean_Theta_y(theta,y)
 
@@ -156,57 +93,111 @@ def Job(theta: np.ndarray,
             print(f"final: k_par: {kernel_para}, func: {min_func}")
 
                 
-        #compute qties for predictions (care: jit fnt cannot use self.<var> = ...) (leaks)
+        #compute qties for predictions
         if (print_dump):
             print("post training...")
         gp_model.set_kernel_hat(kernel_para)
         gp_model.post_training()
+
+        if(print_dump):
+            print("final beta_hat: ", gp_model.beta_hat)
         
-        #Store gp model: Todo do a cleaning before
-        print("store...")
+        #Store gp model
+        if(print_dump):
+            print("store...")
         gp_model.store_info(gp_args["folder_name"],gp_args["file_name"])
 
         #end
-        print("Done")
+        if(print_dump):
+            print("done...")
         return gp_model
 
-# +
-logger.info("Start Pklin")
-start = timer()
 
-for i_pl in range(n_pl):
-    print(f"Process GP_{i_pl}/{n_pl}")
-    theta = arg_pl[i_pl][0] # cosmo \Theta_i i<N_train
-    y = arg_pl[i_pl][1]     # Pk(kj,\Theta_i, z=0)
-    arg_cur_gp = arg_pl[i_pl][2]
-    arg_cur_gp["folder_name"] = arg_pl[i_pl][3]
-    arg_cur_gp["file_name"] = arg_pl[i_pl][4]
- 
+################################
+if __name__ == "__main__":
 
-    # GP emulator should be done each time due to jit
-    # Todo: see how to change GPEmu to avoid
-    gp_model = GPEmuTraining(kernel=kernel_RBF,          # was kernel_RBF,
-                         var=st.var,
-                         order=st.order,
-                         lambda_cap=st.pl_args['lambda_cap'],   #####ICI
-                         l_min=st.l_min,
-                         l_max=st.l_max,
-                         a_min=st.a_min,
-                         a_max=st.a_max,
-                         jitter=st.jitter,
-                         x_trans=st.x_trans,
-                         y_trans=st.pl_args['y_trans'],         ####ICI
-                         use_mean=st.use_mean)
+    args = parser.parse_args()
 
-    
-    gf_job = Job(theta=theta, y=y, 
-             gp_model=gp_model,
-            gp_args=arg_cur_gp,             
-            n_restart= st.n_restart,
-            print_dump=True
-            )
-    
-end = timer()
-print(f"end-start (sec): {end - start}")
-print('All Done')
+
+    #############
+    root_dir =  args.dir
+    dump = args.dump
+
+
+    if not st.sigma8:
+        raise NotImplementedError("Only sigma8 schema is used")
+
+    #############
+    # Load cosmological parameter sets
+    # Omega_cdm, Omega_b, sigma8, ns, h
+    ###########
+    dircosmo = root_dir + '/trainingset'
+    cosmologies = hp.load_arrays(dircosmo,args.cosmo)
+    tag="sigma8"
+
+    if dump:
+        print("0)",cosmologies)
+
+
+    print(f"Cosmo[{tag}]: nber of training Cosmo points {cosmologies.shape[0]} for {cosmologies.shape[1]} params")
+
+    print(f"Order of polynomial approx: {st.order}")
+    print(f"Whitening of x_train: {st.x_trans}")
+    print(f"Transformation of y_tain: {st.gf_args}")
+    print(f"outputs are centred on zero: {st.use_mean}")
+    print(f"noise covariance matrix: {st.var}")
+    print(f"Matrix diag term for stability: { st.jitter}")
+    print(f"z range [{st.zmin}, {st.zmax}]")
+    print(f"k range [{st.k_min_h_by_Mpc}, {st.k_max_h_by_Mpc_TrainingMaker}]")
+
+
+    dirName = root_dir + '/trainingset/' + args.dirIn +'/'
+    pk_linear = hp.load_arrays(dirName, 'pk_linear')
+    print(f"Linear Pk: nber of training points {pk_linear.shape[0]} for {pk_linear.shape[1]} k (log)")
+
+    n_pl = pk_linear.shape[1]
+    assert n_pl == st.nk, "Hummm something strange..."
+    print(f"The number of GPs to model Pklin={n_pl} (= nber of k_bins) ")
+
+    folder_pl = root_dir + '/pknl_components_' + args.tagOut  + '/pl'
+
+    arg_pl = [[cosmologies, pk_linear[:, i], st.pl_args, folder_pl, 'gp_' + str(i)] for i in range(n_pl)]
+
+    if dump:
+        print("Start Pklin")
+    start = timer()
+
+    for i_pl in range(n_pl):
+        print(f"Process GP_{i_pl}/{n_pl}")
+        theta = arg_pl[i_pl][0] # cosmo \Theta_i i<N_train
+        y = arg_pl[i_pl][1]     # Pk(kj,\Theta_i, z=0)
+        arg_cur_gp = arg_pl[i_pl][2]
+        arg_cur_gp["folder_name"] = arg_pl[i_pl][3]
+        arg_cur_gp["file_name"]   = arg_pl[i_pl][4]
+
+
+        gp_model = GPEmuTraining(kernel=kernel_RBF,
+                             var=st.var,
+                             order=st.order,
+                             lambda_cap=st.pl_args['lambda_cap'],
+                             l_min=st.l_min,
+                             l_max=st.l_max,
+                             a_min=st.a_min,
+                             a_max=st.a_max,
+                             jitter=st.jitter,
+                             x_trans=st.x_trans,
+                             y_trans=st.pl_args['y_trans'],
+                             use_mean=st.use_mean)
+
+
+        gf_job = Job(theta=theta, y=y, 
+                     gp_model=gp_model,
+                     gp_args=arg_cur_gp,             
+                     n_restart= st.n_restart,
+                     print_dump=True
+                )
+
+    end = timer()
+    print(f"end-start (sec): {end - start}")
+    print('All Done')
 

@@ -28,15 +28,15 @@ import helper as hp      # load/save
 
 
 #######
-import settings_default as st     #### USER SETTINGS
+import settings_default as st     #### USER SETTINGS 
 #######
 
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument('--dir', default='./', type=str, help='root directory (location of cosmo parameter set and outputs)')
+parser.add_argument('--dir', default='./', type=str, help='root directory (aka [dir] below) (location of cosmo parameter set and outputs)')
 parser.add_argument('--cosmo', type=str, help='cosmology dataset in [dir]/trainingset', required=True)
 parser.add_argument('--dump', action='store_true', help='dump first cosmo param. run and do not save')
-parser.add_argument('--dirOut',default="components_new_", help='final directory under [dir]/trainingset containg the CLASS results. We add the (k,z) grid size info')
+parser.add_argument('--dirOut',default="components_new", help='final directory under [dir]/trainingset containing the CLASS results (we add the ifrst & last cosmo index processed.')
 parser.add_argument('--idrange', type=int, nargs=2, default=[0,1000], help='cosmo parameter index in the dataset [first, last)')
 
 
@@ -106,9 +106,9 @@ if __name__ == "__main__":
 
 
     if st.sigma8:
-        cosmologies = hp.load_arrays(root_dir + 'trainingset','cosmologies_Omega_sig8')
+        dircosmo = root_dir + '/trainingset'
+        cosmologies = hp.load_arrays(dircosmo,args.cosmo)
         tag="sigma8"
-
         if dump:
             print("0)",cosmologies)
     else:
@@ -253,7 +253,7 @@ if __name__ == "__main__":
     ##########
     print("Save....")
 
-    dirName =  root_dir + 'trainingset/' + args.dirOut + str(st.nk) + "x" + str(st.nz) +'_' + \
+    dirName =  root_dir + '/trainingset/' + args.dirOut+ '_' + \
               str(ifirst_cosmo)+ "_" + str(ic) + "/"
         
     if dump:
@@ -279,8 +279,8 @@ if __name__ == "__main__":
         hp.store_arrays(all_pknl0, dirName, fn_pknl)
         hp.store_arrays(all_qfunc_bis, dirName, fn_q_func_bis)
         hp.store_arrays(cosmo_validated,dirName, 'cosmo_validated')
-    else:
-        print("END DUMP: please clean the directry: ",root_dir + 'trainingset')
+
     #
     end = timer()
     print(f"All done (sec): {end - start}")
+    print("END please clean the directry: ",root_dir + '/trainingset')
