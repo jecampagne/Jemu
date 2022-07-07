@@ -2,7 +2,11 @@
 
 *Please notice that this repo is under development and most of the materials are to be used with caution.* 
 
-CLASS Pk emulator in JAX
+CLASS Pk emulator in JAX. The schema of emulation is summarized in this slide
+
+![image](https://user-images.githubusercontent.com/20539759/177787313-3dd12158-f021-4340-89d8-fe91a917fe99.png)
+
+
 Jump to the [Jemu-demo.ipynb](https://github.com/jecampagne/Jemu/blob/main/Jemu-demo.ipynb) and play with it...
 In the current version running on GPU (type K80): 
 - loading the Emulator parameters can take ~30 sec dependig on the bandwidth
@@ -25,11 +29,17 @@ Since 6th July 22, I edit some scripts to ease the process to create new CLASS e
   The CLASS run can take very long time, so we store the correspondant files at each validation
     of a new cosmology set in a temporary directory indexed by the first cosmology index and the last to date run
     
-  One can launch on paralell batch the computation of different ranges of cosmo sets as for instance
+  One can launch on different batch queue the computation of different ranges of cosmo sets as for instance
   ```python
-  python make_trainingset_gfpkq.py --idrange 0, 100    &
-  python make_trainingset_gfpkq.py --idrange 100, 200   &
+  python make_trainingset_gfpkq.py --idrange 0, 100
+  python make_trainingset_gfpkq.py --idrange 100, 200
+  ...
   ```
   
-It is the responsability of the user to properly merge the diffrent files afterwards.
+*It is the responsability of the user to properly merge the diffrent files afterwards.*
+
+- `script_emu_<baseBlock>_training.py`: script to train <baseBlock> with baseBlock in {"pklin","pknl","growth_kscale","qfunc_bis"}. 
+
+Even is the 4 scripts look very similar, I keep all of them to launch one per batch queue.
+
 
